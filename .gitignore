@@ -1,0 +1,7 @@
+
+build/esp32.esp32.esp32doit-devkit-v1/gpsClockV2.ino.bootloader.bin
+build/esp32.esp32.esp32doit-devkit-v1/gpsClockV2.ino.bin
+build/esp32.esp32.esp32doit-devkit-v1/gpsClockV2.ino.elf
+build/esp32.esp32.esp32doit-devkit-v1/gpsClockV2.ino.map
+build/esp32.esp32.esp32doit-devkit-v1/gpsClockV2.ino.merged.bin
+build/esp32.esp32.esp32doit-devkit-v1/gpsClockV2.ino.partitions.bin
