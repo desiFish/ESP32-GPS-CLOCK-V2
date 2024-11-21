@@ -25,7 +25,7 @@
 ## Upcoming Features
 Check [Issues](https://github.com/KamadoTanjiro-beep/ESP32-GPS-Clock-V2/issues)
 
-## Pictures, Schematics and other stuff (COMING SOON, check ***issues***)
+## Pictures, Schematics and other stuff 
 <img src="https://github.com/KamadoTanjiro-beep/ESP32-GPS-Clock-V2/blob/main/schematics/Schematic_ESP32-GPS-CLOCK-V2_2024-11-20.png" alt="Schematics" width="400" height="300">
 
 <img src="https://github.com/KamadoTanjiro-beep/ESP32-GPS-Clock-V2/blob/main/resources/x1.jpg" alt="front-view" width="400" height="300">
