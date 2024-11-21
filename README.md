@@ -1,5 +1,5 @@
 # ESP32-GPS-Clock-V2
- GPS Clock redeveloped with buttons and dual core processing.
+ GPS Clock redeveloped with buttons and dual-core processing.
 
 ## Hardware
 1. ESP32
@@ -16,6 +16,12 @@
 10. BMS (for the cell) and diode (IN4007)
 11. Wires and other stuff (like Prototyping board, connectors, switch etc.. as needed)
 
+### Construction
+* Used a PVC box (used for electrical fixtures) as a frame for the clock (I do not have a 3d printer)
+* Used metal cutters in the drilling machine for cutting out holes.
+* Fixed the display using hot glue
+* make a transparent yet sealed window for the light sensor using hot glue
+  
 ## Upcoming Features
 Check [Issues](https://github.com/KamadoTanjiro-beep/ESP32-GPS-Clock-V2/issues)
 
