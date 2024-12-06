@@ -4,108 +4,108 @@
   Copyright (c) 2024, A. Patra, and others (library owners, hardware etc.)
   All rights reserved.
 
-  Redistribution and use in source and binary forms, with or without modification, 
+  Redistribution and use in source and binary forms, with or without modification,
   are permitted provided that the following conditions are met:
 
-  * Redistributions of source code must retain the above copyright notice, this list 
+  * Redistributions of source code must retain the above copyright notice, this list
     of conditions and the following disclaimer.
-    
-  * Redistributions in binary form must reproduce the above copyright notice, this 
-    list of conditions and the following disclaimer in the documentation and/or other 
+
+  * Redistributions in binary form must reproduce the above copyright notice, this
+    list of conditions and the following disclaimer in the documentation and/or other
     materials provided with the distribution.
 
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND 
-  CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, 
-  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
-  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
-  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR 
-  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
-  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
-  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
-  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-  STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF 
-  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+  CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+  STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#define SWVersion "1.0.0"
-//For basic ESP32 stuff like wifi, OTA Update and Wifi Manager Server
+#define SWVersion "1.0.1"
+// For basic ESP32 stuff like wifi, OTA Update and Wifi Manager Server
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
-//for display
+// for display
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <SPI.h>
-//I2C related
+// I2C related
 #include <Wire.h>
-#include <BH1750.h>  //Light Sensor BH1750
+#include <BH1750.h> //Light Sensor BH1750
 #include <AHTxx.h>
 
-//GPS and Timing
+// GPS and Timing
 #include <TinyGPSPlus.h>
 #include <TimeLib.h>
 
-//Data Storage
+// Data Storage
 #include <Preferences.h>
 
-//display contstructor for ST7920 controlled 128x64 Graphic LCD
+// display contstructor for ST7920 controlled 128x64 Graphic LCD
 U8G2_ST7920_128X64_F_SW_SPI u8g2(U8G2_R0, /* clock=*/18, /* data=*/23, /* cs=*/U8X8_PIN_NONE, /* reset=*/U8X8_PIN_NONE);
 
-//Preference library object or instance
+// Preference library object or instance
 Preferences pref;
-//Light Sensor Object
+// Light Sensor Object
 BH1750 lightMeter;
 
-float ahtValue;  //to store T/RH result
+float ahtValue; // to store T/RH result
 
-AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR);  //sensor address, sensor type
+AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); // sensor address, sensor type
 
 // GPS pins
 static const int RXPin = 16, TXPin = 17;
-//LCD Brightness control
+// LCD Brightness control
 #define LCD_LIGHT 4
-//Others
+// Others
 #define BUZZER_PIN 33
 #define NEXT_BUTTON 36
 #define SELECT_BUTTON 39
 
-//GPS instance
+// GPS instance
 TinyGPSPlus gps;
 
-String week[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
-String monthChar[12] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+String week[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+String monthChar[12] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
-//used for blinking ":" in time (for display)
+// used for blinking ":" in time (for display)
 byte pulse = 0;
-//variables for holding time data globally
+// variables for holding time data globally
 byte days = 0, months = 0, hours = 0, minutes = 0, seconds = 0;
 int years = 0;
 
-//LUX (BH1750) update frequency
+// LUX (BH1750) update frequency
 unsigned long lastTime1 = 0;
-const long timerDelay1 = 3000;  // LUX delay
+const long timerDelay1 = 3000; // LUX delay
 
-//AHT25 update frequency
+// AHT25 update frequency
 unsigned long lastTime2 = 0;
-const long timerDelay2 = 12000;  // aht update delay
+const long timerDelay2 = 12000; // aht update delay
 
 bool isDark = false;
 float ahtTemp = 0.0;
 
-//features config, saved in preference library
+// features config, saved in preference library
 int LCD_BRIGHTNESS, buzzVol;
-bool autoBright, hourlyAlarm, halfHourlyAlarm, useWifi, muteDark;  //Auto brightness status indicator
+bool autoBright, hourlyAlarm, halfHourlyAlarm, useWifi, muteDark; // Auto brightness status indicator
 
-//your wifi name and password (saved in preference library)
+// your wifi name and password (saved in preference library)
 String ssid;
 String password;
 
-//for various server related stuff
+// for various server related stuff
 AsyncWebServer server(80);
 
-//Wifi Manager HTML Code
+// Wifi Manager HTML Code
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -248,14 +248,15 @@ button {
 )rawliteral";
 
 // Search for parameter in HTTP POST request
-const char* PARAM_INPUT_1 = "ssid";
-const char* PARAM_INPUT_2 = "pass";
+const char *PARAM_INPUT_1 = "ssid";
+const char *PARAM_INPUT_2 = "pass";
 
 bool updateInProgress = false;
 
-//Elegant OTA related task
+// Elegant OTA related task
 unsigned long ota_progress_millis = 0;
-void onOTAStart() {
+void onOTAStart()
+{
   // Log when OTA has started
   updateInProgress = true;
   Serial.println("OTA update started!");
@@ -270,9 +271,11 @@ void onOTAStart() {
   // <Add your own code here>
 }
 
-void onOTAProgress(size_t current, size_t final) {
+void onOTAProgress(size_t current, size_t final)
+{
   // Log
-  if (millis() - ota_progress_millis > 500) {
+  if (millis() - ota_progress_millis > 500)
+  {
     ota_progress_millis = millis();
     Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
     u8g2.clearBuffer();
@@ -293,9 +296,11 @@ void onOTAProgress(size_t current, size_t final) {
   }
 }
 
-void onOTAEnd(bool success) {
+void onOTAEnd(bool success)
+{
   // Log when OTA has finished
-  if (success) {
+  if (success)
+  {
     Serial.println("OTA update finished successfully!");
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_luRS08_tr);
@@ -304,7 +309,9 @@ void onOTAEnd(bool success) {
     u8g2.setCursor(1, 32);
     u8g2.print("COMPLETED!");
     u8g2.sendBuffer();
-  } else {
+  }
+  else
+  {
     Serial.println("There was an error during OTA update!");
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_luRS08_tr);
@@ -319,64 +326,72 @@ void onOTAEnd(bool success) {
   delay(1000);
 }
 
-time_t prevDisplay = 0;  // when the digital clock was displayed
+time_t prevDisplay = 0; // when the digital clock was displayed
 
-//for creating task attached to CORE 0 of CPU
+// for creating task attached to CORE 0 of CPU
 TaskHandle_t loop1Task;
 
-//runs only once during booting
-void setup(void) {
+// runs only once during booting
+void setup(void)
+{
   Serial.begin(115200);
-  Serial1.begin(9600, SERIAL_8N1, RXPin, TXPin);  //for GPS running on Hardware Serial
+  Serial1.begin(9600, SERIAL_8N1, RXPin, TXPin); // for GPS running on Hardware Serial
   pinMode(LCD_LIGHT, OUTPUT);
   analogWrite(LCD_LIGHT, 250);
 
   pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN,HIGH);
+  digitalWrite(BUZZER_PIN, HIGH);
   delay(100);
-  digitalWrite(BUZZER_PIN,LOW);
+  digitalWrite(BUZZER_PIN, LOW);
 
-  if (!pref.begin("database", false))  //open database
+  if (!pref.begin("database", false)) // open database
     errorMsgPrint("DATABASE", "ERROR INITIALIZE");
 
   bool checkVal = pref.isKey("lcd_bright");
-  if (!checkVal) {
+  if (!checkVal)
+  {
     pref.putInt("lcd_bright", 250);
   }
   LCD_BRIGHTNESS = pref.getInt("lcd_bright", 250);
 
   checkVal = pref.isKey("autoBright");
-  if (!checkVal) {
+  if (!checkVal)
+  {
     pref.putBool("autoBright", false);
   }
   autoBright = pref.getBool("autoBright", false);
 
   checkVal = pref.isKey("hourlyAlarm");
-  if (!checkVal) {
+  if (!checkVal)
+  {
     pref.putBool("hourlyAlarm", false);
   }
   hourlyAlarm = pref.getBool("hourlyAlarm", false);
 
   checkVal = pref.isKey("halfHourlyAlarm");
-  if (!checkVal) {
+  if (!checkVal)
+  {
     pref.putBool("halfHourlyAlarm", false);
   }
   halfHourlyAlarm = pref.getBool("halfHourlyAlarm", false);
 
   checkVal = pref.isKey("useWifi");
-  if (!checkVal) {
+  if (!checkVal)
+  {
     pref.putBool("useWifi", false);
   }
   useWifi = pref.getBool("useWifi", false);
 
   checkVal = pref.isKey("muteDark");
-  if (!checkVal) {
+  if (!checkVal)
+  {
     pref.putBool("muteDark", false);
   }
   muteDark = pref.getBool("muteDark", false);
 
   checkVal = pref.isKey("buzzVol");
-  if (!checkVal) {
+  if (!checkVal)
+  {
     pref.putInt("buzzVol", 50);
   }
   buzzVol = pref.getInt("buzzVol", 50);
@@ -387,8 +402,8 @@ void setup(void) {
   if (!lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
     errorMsgPrint("BH1750", "CANNOT FIND");
 
-
-  if (aht20.begin() != true) {
+  if (aht20.begin() != true)
+  {
     errorMsgPrint("AHT25", "CANNOT FIND");
   }
   u8g2.begin();
@@ -400,20 +415,22 @@ void setup(void) {
   u8g2.print("GPS CLOCK");
   u8g2.sendBuffer();
   xTaskCreatePinnedToCore(
-    loop1,       /* Task function. */
-    "loop1Task", /* name of task. */
-    10000,       /* Stack size of task */
-    NULL,        /* parameter of the task */
-    1,           /* priority of the task */
-    &loop1Task,  /* Task handle to keep track of created task */
-    0);          /* pin task to core 0 */
+      loop1,       /* Task function. */
+      "loop1Task", /* name of task. */
+      10000,       /* Stack size of task */
+      NULL,        /* parameter of the task */
+      1,           /* priority of the task */
+      &loop1Task,  /* Task handle to keep track of created task */
+      0);          /* pin task to core 0 */
 
   delay(2500);
 
-  //wifi manager
-  if (useWifi) {
+  // wifi manager
+  if (useWifi)
+  {
     bool wifiConfigExist = pref.isKey("ssid");
-    if (!wifiConfigExist) {
+    if (!wifiConfigExist)
+    {
       pref.putString("ssid", "");
       pref.putString("password", "");
     }
@@ -421,7 +438,8 @@ void setup(void) {
     ssid = pref.getString("ssid", "");
     password = pref.getString("password", "");
 
-    if (ssid == "" || password == "") {
+    if (ssid == "" || password == "")
+    {
       Serial.println("No values saved for ssid or password");
       // Connect to Wi-Fi network with SSID and password
       Serial.println("Setting AP (Access Point)");
@@ -434,11 +452,11 @@ void setup(void) {
       wifiManagerInfoPrint();
 
       // Web Server Root URL
-      server.on("/wifi", HTTP_GET, [](AsyncWebServerRequest* request) {
-        request->send(200, "text/html", index_html);
-      });
+      server.on("/wifi", HTTP_GET, [](AsyncWebServerRequest *request)
+                { request->send(200, "text/html", index_html); });
 
-      server.on("/wifi", HTTP_POST, [](AsyncWebServerRequest* request) {
+      server.on("/wifi", HTTP_POST, [](AsyncWebServerRequest *request)
+                {
         int params = request->params();
         for (int i = 0; i < params; i++) {
           const AsyncWebParameter* p = request->getParam(i);
@@ -464,8 +482,7 @@ void setup(void) {
         }
         request->send(200, "text/plain", "Done. Device will now restart.");
         delay(3000);
-        ESP.restart();
-      });
+        ESP.restart(); });
       server.begin();
       WiFi.onEvent(WiFiEvent);
       while (true)
@@ -485,11 +502,12 @@ void setup(void) {
     u8g2.setCursor(1, 32);
     u8g2.print("TO CONNECT");
     u8g2.sendBuffer();
-    /*
-  count variable stores the status of WiFi connection. 0 means NOT CONNECTED. 1 means CONNECTED
-  */
+
+    // count variable stores the status of WiFi connection. 0 means NOT CONNECTED. 1 means CONNECTED
+
     bool count = 1;
-    while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    while (WiFi.waitForConnectResult() != WL_CONNECTED)
+    {
       u8g2.clearBuffer();
       u8g2.setFont(u8g2_font_luRS08_tr);
       u8g2.setCursor(1, 20);
@@ -506,7 +524,8 @@ void setup(void) {
       count = 0;
       break;
     }
-    if (count) {  //if wifi is connected
+    if (count)
+    { // if wifi is connected
       Serial.println(ssid);
       Serial.println(WiFi.localIP());
       u8g2.clearBuffer();
@@ -518,13 +537,12 @@ void setup(void) {
       u8g2.sendBuffer();
       delay(4000);
 
-      server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
-        request->send(200, "text/plain", "Hi! Please add "
-                                         "/update"
-                                         " on the above address.");
-      });
+      server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+                { request->send(200, "text/plain", "Hi! Please add "
+                                                   "/update"
+                                                   " on the above address."); });
 
-      ElegantOTA.begin(&server);  // Start ElegantOTA
+      ElegantOTA.begin(&server); // Start ElegantOTA
       // ElegantOTA callbacks
       ElegantOTA.onStart(onOTAStart);
       ElegantOTA.onProgress(onOTAProgress);
@@ -534,7 +552,7 @@ void setup(void) {
       Serial.println("HTTP server started");
     }
   }
-  //Wifi related stuff END
+  // Wifi related stuff END
 
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_7x14B_mr);
@@ -543,21 +561,25 @@ void setup(void) {
   u8g2.setCursor(36, 52);
   u8g2.print("MINI");
   u8g2.setFont(u8g2_font_streamline_food_drink_t);
-  u8g2.drawUTF8(80, 54, "U+4");  //birthday cake icon
+  u8g2.drawUTF8(80, 54, "U+4"); // birthday cake icon
   u8g2.sendBuffer();
   delay(2500);
 
   pref.end();
-  ahtTemp = (aht20.readTemperature() - 3);
+  ahtTemp = (aht20.readTemperature() - 3); // NEED TO CHANGE THE SENSOR, it shows +3 degrees extra
 }
 
-//RUNS ON CORE 0
-void loop1(void* pvParameters) {
-  for (;;) {
-    if ((millis() - lastTime1) > timerDelay1) {  // light sensor based power saving operations
+// RUNS ON CORE 0
+void loop1(void *pvParameters)
+{
+  for (;;)
+  {
+    if ((millis() - lastTime1) > timerDelay1)
+    { // light sensor based power saving operations
       lightMeter.configure(BH1750::ONE_TIME_HIGH_RES_MODE);
       float lux;
-      while (!lightMeter.measurementReady(true)) {
+      while (!lightMeter.measurementReady(true))
+      {
         yield();
       }
       lux = lightMeter.readLightLevel();
@@ -565,19 +587,22 @@ void loop1(void* pvParameters) {
       Serial.println("LUXRaw: ");
       Serial.println(lux);
 
-      if (muteDark) {  //is mute on dark enabled by user
+      if (muteDark)
+      { // is mute on dark enabled by user
         if (lux <= 2)
           isDark = true;
         else
           isDark = false;
       }
       // Brightness control
-      if (autoBright) {
+      if (autoBright)
+      {
         if (lux == 0)
           analogWrite(LCD_LIGHT, 1);
-        else {
-          byte val1 = constrain(lux, 1, 120);      // constrain(number to constrain, lower end, upper end)
-          byte val3 = map(val1, 1, 120, 20, 255);  // map(value, fromLow, fromHigh, toLow, toHigh);  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+        else
+        {
+          byte val1 = constrain(lux, 1, 120);     // constrain(number to constrain, lower end, upper end)
+          byte val3 = map(val1, 1, 120, 20, 255); // map(value, fromLow, fromHigh, toLow, toHigh);  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
           LCD_BRIGHTNESS = val3;
           Serial.println("LUX: ");
           Serial.println(val3);
@@ -587,30 +612,57 @@ void loop1(void* pvParameters) {
 
       lastTime1 = millis();
     }
-    if ((millis() - lastTime2) > timerDelay2) {
+    if ((millis() - lastTime2) > timerDelay2)
+    {
 
       ahtTemp = (aht20.readTemperature()) - 3;
 
       lastTime2 = millis();
     }
+
+    if (!isDark)
+    { // if mute on dark is not active (or false)
+      if (hourlyAlarm || halfHourlyAlarm)
+      {
+        if (hourlyAlarm)
+        {
+          if ((minutes == 0) && (seconds == 0))
+          {
+            buzzer(600, 1);
+          }
+        }
+        if (halfHourlyAlarm)
+        {
+          if ((minutes == 30) && (seconds == 0))
+          {
+            buzzer(400, 2);
+          }
+        }
+      }
+    }
     delay(100);
   }
 }
 
-//RUNS ON CORE 1
-void loop(void) {
+// RUNS ON CORE 1
+void loop(void)
+{
   if (useWifi)
     ElegantOTA.loop();
 
-  while (gps.hdop.hdop() > 30 && gps.satellites.value() < 4) {
+  while (gps.hdop.hdop() > 30 && gps.satellites.value() < 4)
+  {
     gpsInfo("Waiting for GPS...");
   }
 
-  while (Serial1.available()) {
-    if (gps.encode(Serial1.read())) {  // process gps messages
+  while (Serial1.available())
+  {
+    if (gps.encode(Serial1.read()))
+    { // process gps messages
       // when TinyGPSPlus reports new data...
       unsigned long age = gps.time.age();
-      if (age < 500) {
+      if (age < 500)
+      {
         // set the Time according to the latest GPS reading
         setTime(gps.time.hour(), gps.time.minute(), gps.time.second(), gps.date.day(), gps.date.month(), gps.date.year());
         adjustTime(19800);
@@ -625,9 +677,12 @@ void loop(void) {
   minutes = minute();
   seconds = second();
 
-  if (!updateInProgress) {
-    if (timeStatus() != timeNotSet) {
-      if (now() != prevDisplay) {  //update the display only if the time has changed
+  if (!updateInProgress)
+  {
+    if (timeStatus() != timeNotSet)
+    {
+      if (now() != prevDisplay)
+      { // update the display only if the time has changed
         prevDisplay = now();
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_etl16thai_t);
@@ -641,18 +696,18 @@ void loop(void) {
         u8g2.print("C ");
         String tempWeek = week[weekday() - 1];
         byte stringLen = tempWeek.length();
-        byte newStartPos = 128 - (stringLen * 8);  //keeping it at right side
+        byte newStartPos = 128 - (stringLen * 8); // keeping it at right side
         u8g2.setCursor(newStartPos - 2, 15);
         u8g2.print(tempWeek);
 
         u8g2.drawLine(0, 17, 127, 17);
-        u8g2.setFont(u8g2_font_samim_12_t_all);  //u8g2_font_t0_11_mf  u8g2_font_t0_16_mr
+        u8g2.setFont(u8g2_font_samim_12_t_all); // u8g2_font_t0_11_mf  u8g2_font_t0_16_mr
         u8g2.setCursor(4, 29);
         if (days < 10)
           u8g2.print("0");
         u8g2.print(days);
         byte x = days % 10;
-        u8g2.setFont(u8g2_font_tiny_simon_tr);  //  u8g2_font_profont10_mr
+        u8g2.setFont(u8g2_font_tiny_simon_tr); //  u8g2_font_profont10_mr
         u8g2.setCursor(18, 25);
         if (days == 11 || days == 12 || days == 13)
           u8g2.print("th");
@@ -668,7 +723,7 @@ void loop(void) {
         u8g2.setFont(u8g2_font_samim_12_t_all);
         String tempMonth = monthChar[months - 1];
         stringLen = tempMonth.length();
-        newStartPos = 64 - (stringLen * 4);  //keeping it at center
+        newStartPos = 64 - (stringLen * 4); // keeping it at center
         u8g2.setCursor(newStartPos, 29);
         u8g2.print(tempMonth);
         u8g2.setCursor(97, 29);
@@ -676,7 +731,8 @@ void loop(void) {
 
         u8g2.drawLine(0, 31, 127, 31);
 
-        if (days == 14 && months == 11) {  //special message on birthday
+        if (days == 14 && months == 11)
+        { // special message on birthday
           u8g2.setFont(u8g2_font_6x13_tr);
           u8g2.setCursor(5, 43);
           u8g2.print("HAPPY BIRTHDAY MINI!");
@@ -713,26 +769,18 @@ void loop(void) {
             u8g2.print("AM");
 
           u8g2.setFont(u8g2_font_waffle_t_all);
-          if (!isDark) {  //if mute on dark is not active (or false)
-            if (hourlyAlarm || halfHourlyAlarm) {
-              u8g2.drawUTF8(5, 54, "\ue271");  //symbol for hourly/half-hourly alarm
-              if (hourlyAlarm) {
-                if ((seconds == 0) && (minutes == 0)) {
-                  buzzer(500, 1);
-                }
-              }
-              if (halfHourlyAlarm) {
-                if ((seconds == 0) && (minutes == 0)) {
-                  buzzer(300, 2);
-                }
-              }
-            }
+          if (!isDark)
+          { // if mute on dark is not active (or false)
+            if (hourlyAlarm || halfHourlyAlarm)
+              u8g2.drawUTF8(5, 54, "\ue271"); // symbol for hourly/half-hourly alarm
           }
           if (useWifi)
-            u8g2.drawUTF8(5, 64, "\ue2b5");  //wifi-active symbol
+            u8g2.drawUTF8(5, 64, "\ue2b5"); // wifi-active symbol
 
           u8g2.sendBuffer();
-        } else {
+        }
+        else
+        {
           u8g2.setFont(u8g2_font_logisoso30_tn);
           u8g2.setCursor(15, 63);
           if (hours < 10)
@@ -761,24 +809,14 @@ void loop(void) {
             u8g2.print("AM");
 
           u8g2.setFont(u8g2_font_waffle_t_all);
-          if (!isDark) {  //if mute on dark is not active (or false)
-            if (hourlyAlarm || halfHourlyAlarm) {
-              u8g2.drawUTF8(103, 52, "\ue271");  //symbol for hourly/half-hourly alarm
-              if (hourlyAlarm) {
-                if ((seconds == 0) && (minutes == 0)) {
-                  buzzer(500, 1);
-                }
-              }
-              if (halfHourlyAlarm) {
-                if ((seconds == 0) && (minutes == 30)) {
-                  buzzer(300, 2);
-                }
-              }
-            }
+          if (!isDark)
+          { // if mute on dark is not active (or false)
+            if (hourlyAlarm || halfHourlyAlarm)
+              u8g2.drawUTF8(103, 52, "\ue271"); // symbol for hourly/half-hourly alarm
           }
 
           if (useWifi)
-            u8g2.drawUTF8(112, 52, "\ue2b5");  //wifi-active symbol
+            u8g2.drawUTF8(112, 52, "\ue2b5"); // wifi-active symbol
 
           u8g2.sendBuffer();
         }
@@ -792,13 +830,15 @@ void loop(void) {
 
     // check if the touchValue is below the threshold
     // if it is, set ledPin to HIGH
-    if (analogRead(NEXT_BUTTON) > 1000) {
+    if (analogRead(NEXT_BUTTON) > 1000)
+    {
       menu();
     }
   }
 }
 
-void menu() {
+void menu()
+{
   delay(100);
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_logisoso22_tr);
@@ -807,7 +847,8 @@ void menu() {
   u8g2.sendBuffer();
   delay(500);
   byte count = 0;
-  while (true) {
+  while (true)
+  {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
     u8g2.setCursor(5, 10);
@@ -844,8 +885,8 @@ void menu() {
     else if (count == 6)
       u8g2.drawUTF8(104, 62, "\ue14e");
 
-
-    if (analogRead(NEXT_BUTTON) > 1000) {
+    if (analogRead(NEXT_BUTTON) > 1000)
+    {
       delay(100);
       count++;
       if (count > 6)
@@ -853,33 +894,47 @@ void menu() {
     }
 
     u8g2.sendBuffer();
-    if (analogRead(SELECT_BUTTON) > 1000) {
+    if (analogRead(SELECT_BUTTON) > 1000)
+    {
       delay(100);
-      if (count == 0) {
+      if (count == 0)
+      {
         adjustBrightness();
         count = 6;
-      } else if (count == 1) {
+      }
+      else if (count == 1)
+      {
         editAlarms();
         count = 6;
-      } else if (count == 2) {
+      }
+      else if (count == 2)
+      {
         wifiConfig();
         count = 6;
-      } else if (count == 3) {
+      }
+      else if (count == 3)
+      {
         aboutGPS();
         count = 6;
-      } else if (count == 4) {
+      }
+      else if (count == 4)
+      {
         displayInfo();
         count = 6;
-      } else if (count == 5) {
+      }
+      else if (count == 5)
+      {
         resetAll();
         count = 6;
-      } else if (count == 6)
+      }
+      else if (count == 6)
         return;
     }
   }
 }
-//sub function for adjusting display brightness
-void adjustBrightness() {
+// sub function for adjusting display brightness
+void adjustBrightness()
+{
   pref.begin("database", false);
   delay(100);
   u8g2.clearBuffer();
@@ -889,7 +944,8 @@ void adjustBrightness() {
   u8g2.sendBuffer();
   delay(500);
   byte count = 0;
-  while (true) {
+  while (true)
+  {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
     u8g2.setCursor(5, 10);
@@ -910,7 +966,8 @@ void adjustBrightness() {
     else if (count == 2)
       u8g2.drawUTF8(30, 42, "\ue14e");
 
-    if (analogRead(NEXT_BUTTON) > 1000) {
+    if (analogRead(NEXT_BUTTON) > 1000)
+    {
       delay(100);
       count++;
       if (count > 2)
@@ -918,13 +975,17 @@ void adjustBrightness() {
     }
 
     u8g2.sendBuffer();
-    if (analogRead(SELECT_BUTTON) > 1000) {
+    if (analogRead(SELECT_BUTTON) > 1000)
+    {
       delay(100);
 
-      if (count == 0) {
-        if (autoBright == true) {
+      if (count == 0)
+      {
+        if (autoBright == true)
+        {
           byte i = 3;
-          while (i > 0) {
+          while (i > 0)
+          {
             u8g2.clearBuffer();
             u8g2.setFont(u8g2_font_t0_11_mf);
             u8g2.setCursor(5, 22);
@@ -938,14 +999,17 @@ void adjustBrightness() {
             i--;
           }
           count = 1;
-        } else {
+        }
+        else
+        {
           u8g2.clearBuffer();
           u8g2.setFont(u8g2_font_logisoso20_tr);
           u8g2.setCursor(5, 43);
           u8g2.print("MANUAL");
           u8g2.sendBuffer();
           delay(500);
-          while (true) {
+          while (true)
+          {
             u8g2.clearBuffer();
             u8g2.setFont(u8g2_font_t0_11_mf);
             u8g2.setCursor(5, 10);
@@ -971,7 +1035,8 @@ void adjustBrightness() {
             else if (count == 2)
               u8g2.drawUTF8(32, 62, "\ue14e");
 
-            if (analogRead(NEXT_BUTTON) > 1000) {
+            if (analogRead(NEXT_BUTTON) > 1000)
+            {
               delay(100);
               count++;
               if (count > 2)
@@ -980,22 +1045,26 @@ void adjustBrightness() {
 
             analogWrite(LCD_LIGHT, LCD_BRIGHTNESS);
             u8g2.sendBuffer();
-            if (analogRead(SELECT_BUTTON) > 1000) {
+            if (analogRead(SELECT_BUTTON) > 1000)
+            {
               delay(100);
 
-              if (count == 0) {
+              if (count == 0)
+              {
                 LCD_BRIGHTNESS -= 5;
                 if (LCD_BRIGHTNESS < 5)
                   LCD_BRIGHTNESS = 250;
               }
-              if (count == 1) {
+              if (count == 1)
+              {
                 LCD_BRIGHTNESS += 5;
                 if (LCD_BRIGHTNESS > 250)
                   LCD_BRIGHTNESS = 5;
               }
 
-              if (count == 2) {
-                pref.putInt("lcd_bright", LCD_BRIGHTNESS);  //SAVE THE VALUE
+              if (count == 2)
+              {
+                pref.putInt("lcd_bright", LCD_BRIGHTNESS); // SAVE THE VALUE
                 pref.end();
                 count = 2;
                 break;
@@ -1003,7 +1072,9 @@ void adjustBrightness() {
             }
           }
         }
-      } else if (count == 1) {
+      }
+      else if (count == 1)
+      {
         delay(100);
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_logisoso20_tr);
@@ -1015,7 +1086,8 @@ void adjustBrightness() {
           count = 0;
         else
           count = 1;
-        while (true) {
+        while (true)
+        {
           delay(100);
           u8g2.clearBuffer();
           u8g2.setFont(u8g2_font_t0_11_mf);
@@ -1034,21 +1106,26 @@ void adjustBrightness() {
             u8g2.drawUTF8(24, 32, "\ue14e");
 
           u8g2.sendBuffer();
-          if (analogRead(NEXT_BUTTON) > 1000) {
+          if (analogRead(NEXT_BUTTON) > 1000)
+          {
             delay(100);
             count++;
             if (count > 1)
               count = 0;
           }
 
-          if (analogRead(SELECT_BUTTON) > 1000) {
+          if (analogRead(SELECT_BUTTON) > 1000)
+          {
             delay(100);
-            if (count == 0) {
+            if (count == 0)
+            {
               pref.putBool("autoBright", true);
               autoBright = pref.getBool("autoBright", false);
               pref.end();
               break;
-            } else if (count == 1) {
+            }
+            else if (count == 1)
+            {
               pref.putBool("autoBright", false);
               autoBright = pref.getBool("autoBright", false);
               pref.end();
@@ -1057,7 +1134,9 @@ void adjustBrightness() {
           }
         }
         count = 2;
-      } else if (count == 2) {
+      }
+      else if (count == 2)
+      {
         delay(100);
         pref.end();
         return;
@@ -1065,8 +1144,9 @@ void adjustBrightness() {
     }
   }
 }
-//sub function for hourly, sub hourly alarms and mute in dark
-void editAlarms() {
+// sub function for hourly, sub hourly alarms and mute in dark
+void editAlarms()
+{
   pref.begin("database", false);
   delay(100);
   u8g2.clearBuffer();
@@ -1076,7 +1156,8 @@ void editAlarms() {
   u8g2.sendBuffer();
   delay(500);
   byte count = 0;
-  while (true) {
+  while (true)
+  {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
     u8g2.setCursor(5, 10);
@@ -1105,17 +1186,20 @@ void editAlarms() {
     else if (count == 4)
       u8g2.drawUTF8(30, 62, "\ue14e");
 
-    if (analogRead(NEXT_BUTTON) > 1000) {
+    if (analogRead(NEXT_BUTTON) > 1000)
+    {
       delay(100);
       count++;
       if (count > 4)
         count = 0;
     }
     u8g2.sendBuffer();
-    if (analogRead(SELECT_BUTTON) > 1000) {
+    if (analogRead(SELECT_BUTTON) > 1000)
+    {
       delay(100);
 
-      if (count == 0) {
+      if (count == 0)
+      {
         delay(100);
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_logisoso20_tr);
@@ -1127,7 +1211,8 @@ void editAlarms() {
           count = 0;
         else
           count = 1;
-        while (true) {
+        while (true)
+        {
           delay(100);
           u8g2.clearBuffer();
           u8g2.setFont(u8g2_font_t0_11_mf);
@@ -1146,21 +1231,26 @@ void editAlarms() {
             u8g2.drawUTF8(24, 32, "\ue14e");
 
           u8g2.sendBuffer();
-          if (analogRead(NEXT_BUTTON) > 1000) {
+          if (analogRead(NEXT_BUTTON) > 1000)
+          {
             delay(100);
             count++;
             if (count > 1)
               count = 0;
           }
 
-          if (analogRead(SELECT_BUTTON) > 1000) {
+          if (analogRead(SELECT_BUTTON) > 1000)
+          {
             delay(100);
-            if (count == 0) {
+            if (count == 0)
+            {
               pref.putBool("hourlyAlarm", true);
               hourlyAlarm = pref.getBool("hourlyAlarm", false);
               pref.end();
               break;
-            } else if (count == 1) {
+            }
+            else if (count == 1)
+            {
               pref.putBool("hourlyAlarm", false);
               hourlyAlarm = pref.getBool("hourlyAlarm", false);
               pref.end();
@@ -1169,7 +1259,9 @@ void editAlarms() {
           }
         }
         count = 4;
-      } else if (count == 1) {
+      }
+      else if (count == 1)
+      {
         delay(100);
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_logisoso20_tr);
@@ -1181,7 +1273,8 @@ void editAlarms() {
           count = 0;
         else
           count = 1;
-        while (true) {
+        while (true)
+        {
           delay(100);
           u8g2.clearBuffer();
           u8g2.setFont(u8g2_font_t0_11_mf);
@@ -1199,21 +1292,26 @@ void editAlarms() {
             u8g2.drawUTF8(24, 32, "\ue14e");
           u8g2.sendBuffer();
 
-          if (analogRead(NEXT_BUTTON) > 1000) {
+          if (analogRead(NEXT_BUTTON) > 1000)
+          {
             delay(100);
             count++;
             if (count > 1)
               count = 0;
           }
 
-          if (analogRead(SELECT_BUTTON) > 1000) {
+          if (analogRead(SELECT_BUTTON) > 1000)
+          {
             delay(100);
-            if (count == 0) {
+            if (count == 0)
+            {
               pref.putBool("halfHourlyAlarm", true);
               halfHourlyAlarm = pref.getBool("halfHourlyAlarm", false);
               pref.end();
               break;
-            } else if (count == 1) {
+            }
+            else if (count == 1)
+            {
               pref.putBool("halfHourlyAlarm", false);
               halfHourlyAlarm = pref.getBool("halfHourlyAlarm", false);
               pref.end();
@@ -1222,7 +1320,9 @@ void editAlarms() {
           }
         }
         count = 4;
-      } else if (count == 2) {
+      }
+      else if (count == 2)
+      {
         delay(100);
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_logisoso20_tr);
@@ -1234,7 +1334,8 @@ void editAlarms() {
           count = 0;
         else
           count = 1;
-        while (true) {
+        while (true)
+        {
           delay(100);
           u8g2.clearBuffer();
           u8g2.setFont(u8g2_font_t0_11_mf);
@@ -1252,20 +1353,25 @@ void editAlarms() {
             u8g2.drawUTF8(24, 32, "\ue14e");
 
           u8g2.sendBuffer();
-          if (analogRead(NEXT_BUTTON) > 1000) {
+          if (analogRead(NEXT_BUTTON) > 1000)
+          {
             delay(100);
             count++;
             if (count > 1)
               count = 0;
           }
-          if (analogRead(SELECT_BUTTON) > 1000) {
+          if (analogRead(SELECT_BUTTON) > 1000)
+          {
             delay(100);
-            if (count == 0) {
+            if (count == 0)
+            {
               pref.putBool("muteDark", true);
               muteDark = pref.getBool("muteDark", false);
               pref.end();
               break;
-            } else if (count == 1) {
+            }
+            else if (count == 1)
+            {
               pref.putBool("muteDark", false);
               muteDark = pref.getBool("muteDark", false);
               pref.end();
@@ -1274,7 +1380,9 @@ void editAlarms() {
           }
         }
         count = 4;
-      } else if (count == 3) {
+      }
+      else if (count == 3)
+      {
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_logisoso20_tr);
         u8g2.setCursor(5, 43);
@@ -1282,7 +1390,8 @@ void editAlarms() {
         u8g2.sendBuffer();
         delay(500);
         count = 0;
-        while (true) {
+        while (true)
+        {
           u8g2.clearBuffer();
           u8g2.setFont(u8g2_font_t0_11_mf);
           u8g2.setCursor(5, 10);
@@ -1308,7 +1417,8 @@ void editAlarms() {
           else if (count == 2)
             u8g2.drawUTF8(32, 62, "\ue14e");
 
-          if (analogRead(NEXT_BUTTON) > 1000) {
+          if (analogRead(NEXT_BUTTON) > 1000)
+          {
             delay(100);
             count++;
             if (count > 2)
@@ -1316,24 +1426,28 @@ void editAlarms() {
           }
 
           u8g2.sendBuffer();
-          if (analogRead(SELECT_BUTTON) > 1000) {
+          if (analogRead(SELECT_BUTTON) > 1000)
+          {
             delay(50);
 
-            if (count == 0) {
+            if (count == 0)
+            {
               buzzer(50, 1);
               buzzVol -= 5;
               if (buzzVol < 5)
                 buzzVol = 255;
             }
-            if (count == 1) {
+            if (count == 1)
+            {
               buzzer(50, 1);
               buzzVol += 5;
               if (buzzVol > 255)
                 buzzVol = 5;
             }
 
-            if (count == 2) {
-              pref.putInt("buzzVol", buzzVol);  //SAVE THE VALUE
+            if (count == 2)
+            {
+              pref.putInt("buzzVol", buzzVol); // SAVE THE VALUE
               buzzVol = pref.getInt("buzzVol", 255);
               pref.end();
               count = 2;
@@ -1342,7 +1456,9 @@ void editAlarms() {
           }
         }
         count = 4;
-      } else if (count == 4) {
+      }
+      else if (count == 4)
+      {
         delay(100);
         pref.end();
         return;
@@ -1350,8 +1466,9 @@ void editAlarms() {
     }
   }
 }
-//sub function for turning WIFI on/off
-void wifiConfig() {
+// sub function for turning WIFI on/off
+void wifiConfig()
+{
   pref.begin("database", false);
   delay(100);
   u8g2.clearBuffer();
@@ -1365,7 +1482,8 @@ void wifiConfig() {
     count = 0;
   else
     count = 1;
-  while (true) {
+  while (true)
+  {
     delay(100);
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
@@ -1384,21 +1502,26 @@ void wifiConfig() {
       u8g2.drawUTF8(24, 32, "\ue14e");
 
     u8g2.sendBuffer();
-    if (analogRead(NEXT_BUTTON) > 1000) {
+    if (analogRead(NEXT_BUTTON) > 1000)
+    {
       delay(100);
       count++;
       if (count > 1)
         count = 0;
     }
 
-    if (analogRead(SELECT_BUTTON) > 1000) {
+    if (analogRead(SELECT_BUTTON) > 1000)
+    {
       delay(100);
-      if (count == 0) {
+      if (count == 0)
+      {
         pref.putBool("useWifi", true);
         useWifi = pref.getBool("useWifi", false);
         pref.end();
         break;
-      } else if (count == 1) {
+      }
+      else if (count == 1)
+      {
         pref.putBool("useWifi", false);
         useWifi = pref.getBool("useWifi", false);
         pref.end();
@@ -1407,7 +1530,8 @@ void wifiConfig() {
     }
   }
   byte i = 5;
-  while (i > 0) {
+  while (i > 0)
+  {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_luRS08_tr);
     u8g2.setCursor(5, 21);
@@ -1420,8 +1544,9 @@ void wifiConfig() {
   }
   ESP.restart();
 }
-//sub function for showing gps data
-void aboutGPS() {
+// sub function for showing gps data
+void aboutGPS()
+{
   delay(100);
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_logisoso20_tr);
@@ -1429,17 +1554,20 @@ void aboutGPS() {
   u8g2.print("GPS");
   u8g2.sendBuffer();
   delay(500);
-  while (true) {
+  while (true)
+  {
     gpsInfo("GPS DATA");
-    if (analogRead(SELECT_BUTTON) > 1000 || analogRead(NEXT_BUTTON) > 1000) {
+    if (analogRead(SELECT_BUTTON) > 1000 || analogRead(NEXT_BUTTON) > 1000)
+    {
       delay(100);
       break;
     }
   }
   return;
 }
-//sub function for customised message
-void displayInfo() {
+// sub function for customised message
+void displayInfo()
+{
   delay(100);
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_logisoso20_tr);
@@ -1447,7 +1575,8 @@ void displayInfo() {
   u8g2.print("INFO");
   u8g2.sendBuffer();
   delay(500);
-  while (true) {
+  while (true)
+  {
     delay(100);
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_tiny_simon_tr);
@@ -1476,14 +1605,16 @@ void displayInfo() {
 
     u8g2.sendBuffer();
 
-    if (analogRead(SELECT_BUTTON) > 1000 || analogRead(NEXT_BUTTON) > 1000) {
+    if (analogRead(SELECT_BUTTON) > 1000 || analogRead(NEXT_BUTTON) > 1000)
+    {
       delay(100);
       break;
     }
   }
 }
-//for reseting all configurations in preference library
-void resetAll() {
+// for reseting all configurations in preference library
+void resetAll()
+{
   pref.begin("database", false);
   delay(100);
   u8g2.clearBuffer();
@@ -1494,7 +1625,8 @@ void resetAll() {
   delay(500);
   bool temp;
   byte count = 1;
-  while (true) {
+  while (true)
+  {
     delay(100);
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
@@ -1513,14 +1645,16 @@ void resetAll() {
       u8g2.drawUTF8(24, 32, "\ue14e");
 
     u8g2.sendBuffer();
-    if (analogRead(NEXT_BUTTON) > 1000) {
+    if (analogRead(NEXT_BUTTON) > 1000)
+    {
       delay(100);
       count++;
       if (count > 1)
         count = 0;
     }
 
-    if (analogRead(SELECT_BUTTON) > 1000) {
+    if (analogRead(SELECT_BUTTON) > 1000)
+    {
       delay(100);
       if (count == 0)
         temp = true;
@@ -1529,7 +1663,8 @@ void resetAll() {
       break;
     }
   }
-  if (temp) {
+  if (temp)
+  {
     pref.putInt("lcd_bright", 250);
     pref.putBool("autoBright", false);
     pref.putBool("hourlyAlarm", false);
@@ -1542,7 +1677,8 @@ void resetAll() {
     pref.end();
 
     byte i = 5;
-    while (i > 0) {
+    while (i > 0)
+    {
       u8g2.clearBuffer();
       u8g2.setFont(u8g2_font_luRS08_tr);
       u8g2.setCursor(5, 21);
@@ -1559,15 +1695,18 @@ void resetAll() {
 
 // This custom version of delay() ensures that the gps object
 // is being "fed".
-static void smartDelay(unsigned long ms) {
+static void smartDelay(unsigned long ms)
+{
   unsigned long start = millis();
-  do {
+  do
+  {
     while (Serial1.available())
       gps.encode(Serial1.read());
   } while (millis() - start < ms);
 }
-//helper function for retreiving and displaying gps data along with title ("msg")
-void gpsInfo(String msg) {
+// helper function for retreiving and displaying gps data along with title ("msg")
+void gpsInfo(String msg)
+{
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_luRS08_tr);
   u8g2.setCursor(1, 9);
@@ -1595,7 +1734,7 @@ void gpsInfo(String msg) {
   u8g2.print("Fix Age");
   u8g2.setCursor(6, 63);
   u8g2.print(gps.time.age());
-  u8g2.print("ms");  //
+  u8g2.print("ms"); //
 
   u8g2.setCursor(42, 51);
   u8g2.print("Altitude");
@@ -1615,9 +1754,11 @@ void gpsInfo(String msg) {
   smartDelay(900);
 }
 
-//int delay value, byte count value
-void buzzer(int Delay, byte count) {
-  for (int i = 0; i < count; i++) {
+// int delay value, byte count value
+void buzzer(int Delay, byte count)
+{
+  for (int i = 0; i < count; i++)
+  {
     analogWrite(BUZZER_PIN, buzzVol);
     delay(Delay);
     analogWrite(BUZZER_PIN, 0);
@@ -1625,8 +1766,9 @@ void buzzer(int Delay, byte count) {
   }
 }
 
-//related to wifi manager helping screen
-void wifiManagerInfoPrint() {
+// related to wifi manager helping screen
+void wifiManagerInfoPrint()
+{
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_luRS08_tr);
   u8g2.setCursor(1, 10);
@@ -1641,9 +1783,11 @@ void wifiManagerInfoPrint() {
   u8g2.print("Password: WIFImanager");
   u8g2.sendBuffer();
 }
-//related to wifi manager helping screen, triggers when user connect to access point of esp32
-void WiFiEvent(WiFiEvent_t event) {
-  if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
+// related to wifi manager helping screen, triggers when user connect to access point of esp32
+void WiFiEvent(WiFiEvent_t event)
+{
+  if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED)
+  {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_luRS08_tr);
     u8g2.setCursor(1, 10);
@@ -1660,8 +1804,10 @@ void WiFiEvent(WiFiEvent_t event) {
   }
 }
 
-void errorMsgPrint(String device, String msg) {
-  while (true) {
+void errorMsgPrint(String device, String msg)
+{
+  while (true)
+  {
     delay(50);
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
@@ -1672,7 +1818,8 @@ void errorMsgPrint(String device, String msg) {
     u8g2.print("msg");
 
     byte i = 5;
-    while (i > 0) {
+    while (i > 0)
+    {
       u8g2.clearBuffer();
       u8g2.setFont(u8g2_font_luRS08_tr);
       u8g2.setCursor(60, 51);
