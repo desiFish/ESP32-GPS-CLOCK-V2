@@ -1804,30 +1804,21 @@ void WiFiEvent(WiFiEvent_t event)
   }
 }
 
-void errorMsgPrint(String device, String msg)
-{
-  while (true)
-  {
-    delay(50);
+void errorMsgPrint(String device, String msg) {
+  byte i = 5;
+  while (i > 0) {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
     u8g2.setCursor(5, 10);
     u8g2.print("ERROR: " + device);
     u8g2.drawLine(0, 11, 127, 11);
     u8g2.setCursor(5, 22);
-    u8g2.print("msg");
-
-    byte i = 5;
-    while (i > 0)
-    {
-      u8g2.clearBuffer();
-      u8g2.setFont(u8g2_font_luRS08_tr);
-      u8g2.setCursor(60, 51);
-      u8g2.print(i);
-      u8g2.sendBuffer();
-      delay(1000);
-      i--;
-    }
-    break;
+    u8g2.print(msg);
+    u8g2.setFont(u8g2_font_luRS08_tr);
+    u8g2.setCursor(60, 51);
+    u8g2.print(i);
+    u8g2.sendBuffer();
+    delay(1000);
+    i--;
   }
 }
