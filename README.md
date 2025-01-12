@@ -16,7 +16,7 @@
 ## 🛠️ Hardware Components
 
 ### 📡 Core Components
-1. **ESP32 Development Board** 
+1. **ESP32 Development Board** <img src="https://raw.githubusercontent.com/espressif/esp-idf/master/docs/_static/espressif-logo.svg" width="20" height="20" style="vertical-align: middle;">
    - Dual-core processor up to 240MHz
    - Integrated Wi-Fi and Bluetooth
    - Operating voltage: 3.3V
