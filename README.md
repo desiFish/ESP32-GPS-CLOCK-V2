@@ -16,7 +16,7 @@
 ## 🛠️ Hardware Components
 
 ### 📡 Core Components
-1. **ESP32 Development Board** <img src="https://raw.githubusercontent.com/espressif/esp-idf/master/docs/_static/espressif-logo.svg" width="20" height="20" style="vertical-align: middle;">
+1. **ESP32 Development Board** ![ESP32](https://img.shields.io/badge/ESP32-000000?style=flat&logo=espressif&logoColor=white)
    - Dual-core processor up to 240MHz
    - Integrated Wi-Fi and Bluetooth
    - Operating voltage: 3.3V
@@ -142,24 +142,24 @@ Check [Issues](https://github.com/desiFish/ESP32-GPS-Clock-V2/issues)
 ## 📷 Pictures, Schematics and other stuff 
 <table>
   <tr>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/schematics/Schematic_ESP32-GPS-CLOCK-V2_2024-11-20.png" alt="Schematics"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x10.jpg" alt="front-view"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x1.jpg" alt="front-view"></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/schematics/Schematic_ESP32-GPS-CLOCK-V2_2024-11-20.png" alt="Schematics"><br><p align="center">Schematics</p></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x10.jpg" alt="front-view"><br><p align="center">Front View</p></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x1.jpg" alt="front-view"><br><p align="center">Front View</p></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x11.jpg" alt="inside"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x2.jpg" alt="display-connections"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x3.jpg" alt="bme280"></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x11.jpg" alt="inside"><br><p align="center">Inside View</p></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x2.jpg" alt="display-connections"><br><p align="center">Display Connections</p></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x3.jpg" alt="bme280"><br><p align="center">BME280 Sensor</p></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x4.jpg" alt="testing-phase"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x5.jpg" alt="esp32_with_connections"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x6.jpg" alt="circuit-connections"></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x4.jpg" alt="testing-phase"><br><p align="center">Testing Phase</p></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x5.jpg" alt="esp32_with_connections"><br><p align="center">ESP32 with Connections</p></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x6.jpg" alt="circuit-connections"><br><p align="center">Circuit Connections</p></td>
   </tr>
   <tr>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x7.jpg" alt="cutting-display-window"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x8.jpg" alt="display-in-plastic-frame"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x9.jpg" alt="fullview"></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x7.jpg" alt="cutting-display-window"><br><p align="center">Cutting Display Window</p></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x8.jpg" alt="display-in-plastic-frame"><br><p align="center">Display in Plastic Frame</p></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x9.jpg" alt="fullview"><br><p align="center">Full View</p></td>
   </tr>
 </table>
 
