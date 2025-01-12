@@ -255,6 +255,10 @@ bool updateInProgress = false;
 
 // Elegant OTA related task
 unsigned long ota_progress_millis = 0;
+
+/**
+ * @brief Handle OTA update start event
+ */
 void onOTAStart()
 {
   // Log when OTA has started
@@ -271,6 +275,11 @@ void onOTAStart()
   // <Add your own code here>
 }
 
+/**
+ * @brief Handle OTA update progress
+ * @param current Current bytes transferred
+ * @param final Total bytes to transfer
+ */
 void onOTAProgress(size_t current, size_t final)
 {
   // Log
@@ -296,6 +305,10 @@ void onOTAProgress(size_t current, size_t final)
   }
 }
 
+/**
+ * @brief Handle OTA update completion
+ * @param success Boolean indicating if update was successful
+ */
 void onOTAEnd(bool success)
 {
   // Log when OTA has finished
@@ -331,7 +344,9 @@ time_t prevDisplay = 0; // when the digital clock was displayed
 // for creating task attached to CORE 0 of CPU
 TaskHandle_t loop1Task;
 
-// runs only once during booting
+/**
+ * @brief Runs only once during booting
+ */
 void setup(void)
 {
   Serial.begin(115200);
@@ -569,7 +584,10 @@ void setup(void)
   ahtTemp = (aht20.readTemperature() - 3); // NEED TO CHANGE THE SENSOR, it shows +3 degrees extra
 }
 
-// RUNS ON CORE 0
+/**
+ * @brief Secondary loop running on Core 0
+ * @param pvParameters Required parameter for FreeRTOS task
+ */
 void loop1(void *pvParameters)
 {
   for (;;)
@@ -837,6 +855,9 @@ void loop(void)
   }
 }
 
+/**
+ * @brief Main menu handling function
+ */
 void menu()
 {
   delay(100);
@@ -932,7 +953,10 @@ void menu()
     }
   }
 }
-// sub function for adjusting display brightness
+
+/**
+ * @brief Configure display brightness settings
+ */
 void adjustBrightness()
 {
   pref.begin("database", false);
@@ -1144,7 +1168,10 @@ void adjustBrightness()
     }
   }
 }
-// sub function for hourly, sub hourly alarms and mute in dark
+
+/**
+ * @brief Configure alarm settings
+ */
 void editAlarms()
 {
   pref.begin("database", false);
@@ -1466,7 +1493,10 @@ void editAlarms()
     }
   }
 }
-// sub function for turning WIFI on/off
+
+/**
+ * @brief Configure WiFi settings
+ */
 void wifiConfig()
 {
   pref.begin("database", false);
@@ -1544,7 +1574,10 @@ void wifiConfig()
   }
   ESP.restart();
 }
-// sub function for showing gps data
+
+/**
+ * @brief Display GPS status and data
+ */
 void aboutGPS()
 {
   delay(100);
@@ -1565,7 +1598,10 @@ void aboutGPS()
   }
   return;
 }
-// sub function for customised message
+
+/**
+ * @brief Display device information and credits
+ */
 void displayInfo()
 {
   delay(100);
@@ -1612,7 +1648,10 @@ void displayInfo()
     }
   }
 }
-// for reseting all configurations in preference library
+
+/**
+ * @brief Reset all settings to default values
+ */
 void resetAll()
 {
   pref.begin("database", false);
@@ -1693,8 +1732,10 @@ void resetAll()
   }
 }
 
-// This custom version of delay() ensures that the gps object
-// is being "fed".
+/**
+ * @brief Custom delay function that ensures GPS data is processed
+ * @param ms Time to delay in milliseconds
+ */
 static void smartDelay(unsigned long ms)
 {
   unsigned long start = millis();
@@ -1704,7 +1745,11 @@ static void smartDelay(unsigned long ms)
       gps.encode(Serial1.read());
   } while (millis() - start < ms);
 }
-// helper function for retreiving and displaying gps data along with title ("msg")
+
+/**
+ * @brief Display GPS information on the LCD screen
+ * @param msg Title message to display
+ */
 void gpsInfo(String msg)
 {
   u8g2.clearBuffer();
@@ -1754,7 +1799,11 @@ void gpsInfo(String msg)
   smartDelay(900);
 }
 
-// int delay value, byte count value
+/**
+ * @brief Generate buzzer sounds with specified parameters
+ * @param Delay Duration of each beep in milliseconds
+ * @param count Number of beeps to generate
+ */
 void buzzer(int Delay, byte count)
 {
   for (int i = 0; i < count; i++)
@@ -1766,7 +1815,9 @@ void buzzer(int Delay, byte count)
   }
 }
 
-// related to wifi manager helping screen
+/**
+ * @brief Display WiFi manager configuration instructions
+ */
 void wifiManagerInfoPrint()
 {
   u8g2.clearBuffer();
@@ -1783,7 +1834,11 @@ void wifiManagerInfoPrint()
   u8g2.print("Password: WIFImanager");
   u8g2.sendBuffer();
 }
-// related to wifi manager helping screen, triggers when user connect to access point of esp32
+
+/**
+ * @brief Handle WiFi events and display appropriate messages
+ * @param event WiFiEvent type indicating the event that occurred
+ */
 void WiFiEvent(WiFiEvent_t event)
 {
   if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED)
@@ -1804,9 +1859,16 @@ void WiFiEvent(WiFiEvent_t event)
   }
 }
 
-void errorMsgPrint(String device, String msg) {
+/**
+ * @brief Display error messages with countdown
+ * @param device Name of the device causing error
+ * @param msg Error message to display
+ */
+void errorMsgPrint(String device, String msg)
+{
   byte i = 5;
-  while (i > 0) {
+  while (i > 0)
+  {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
     u8g2.setCursor(5, 10);
