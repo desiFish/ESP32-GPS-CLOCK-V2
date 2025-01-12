@@ -11,7 +11,7 @@
   [![GitHub repo size](https://img.shields.io/github/repo-size/desiFish/ESP32-GPS-Clock-V2)](https://github.com/desiFish/ESP32-GPS-Clock-V2)
 </div>
 
-> Read ⚠️ Important Notice below
+> Read ⚠️ Important Notice below gallery section
 
 ## 🛠️ Hardware Components
 
@@ -20,7 +20,7 @@
    - Dual-core processor up to 240MHz
    - Integrated Wi-Fi and Bluetooth
    - Operating voltage: 3.3V
-   - Recommended: ESP32-WROOM-32
+   - Tested on: ESP32-Devkit-V1
 
 2. **BH1750 Light Sensor** 🌞
    - 16-bit digital output
@@ -50,6 +50,10 @@
    - Tactile momentary switches
    - Life cycle: 100,000 clicks
    - With caps for better feel
+   - Two for Menu navigation, one for reset
+
+7. **10K Potentiometer**
+   - For contrast adjustment
 
 ### 🔋 Optional Components (Battery Backup)
 
