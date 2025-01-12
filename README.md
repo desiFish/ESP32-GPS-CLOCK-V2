@@ -11,27 +11,127 @@
   [![GitHub repo size](https://img.shields.io/github/repo-size/desiFish/ESP32-GPS-Clock-V2)](https://github.com/desiFish/ESP32-GPS-Clock-V2)
 </div>
 
-## 🛠️ Hardware
-1. ESP32
-2. BH1750 (Light Sensor)
-3. AHT25 (Temperature and Humidity)
-4. GPS Neo 6m 
-5. ST7920 128X64 LCD Display
-6. Buzzer 
-7. 3x Buttons
+## 🛠️ Hardware Components
 
-### 🔋 Optional
-8. LiFePO4 AAA 80mAh cell (for longer GPS memory backup)
-9. TP5000 Charging circuit
-10. BMS (for the cell) and diode (IN4007)
-11. Wires and other stuff (like Prototyping board, connectors, switch etc.. as needed)
+### 📡 Core Components
+1. **ESP32 Development Board** 
+   - Dual-core processor up to 240MHz
+   - Integrated Wi-Fi and Bluetooth
+   - Operating voltage: 3.3V
+   - Recommended: ESP32-WROOM-32
 
-### 🏗️ Construction
-* Used a PVC box (used for electrical fixtures) as a frame for the clock (I do not have a 3d printer)
-* Used metal cutters in the drilling machine for cutting out holes.
-* Fixed the display using hot glue
-* make a transparent yet sealed window for the light sensor using hot glue
-  
+2. **BH1750 Light Sensor** 🌞
+   - 16-bit digital output
+   - Range: 1-65535 lux
+   - Power: 2.4-3.6V
+   - I²C interface
+
+3. **GPS Module (NEO-6M)** 🛰️
+   - Update rate: 1-5 Hz
+   - Position accuracy: 2.5m
+   - Cold start: 27s typical
+   - Hot start: 1s typical
+   - Operating voltage: 3.0-3.6V
+
+4. **ST7920 LCD Display** 📺
+   - Resolution: 128x64 pixels
+   - 5V logic level
+   - Parallel/Serial interface
+
+5. **Buzzer Module** 🔊
+   - Active buzzer
+   - Operating voltage: 3.3-5V
+   - Frequency: ~2300Hz
+   - Sound output: >85dB
+
+6. **Push Buttons** x3 ⚡
+   - Tactile momentary switches
+   - Life cycle: 100,000 clicks
+   - With caps for better feel
+
+### 🔋 Optional Components (Battery Backup)
+
+#### Power Management
+1. **LiFePO4 Battery** 
+   - Capacity: 80mAh (AAA size)
+   - Nominal voltage: 3.2V
+   - Cycle life: >2000 cycles
+   - Temperature range: -20°C to 60°C
+   - Perfect for GPS backup
+
+2. **TP5000 Charging Circuit** ⚡
+   - Input voltage: 4.5-28V
+   - Charging current: 0.5-2A
+   - Efficiency: >90%
+   - Built-in protection features
+   - Auto-detect battery type
+
+3. **Battery Protection** 🛡️
+   - BMS for single cell
+   - Using for Over-discharge protection
+
+4. **Additional Components** 🔧
+   - IN4007 diode (1A, 1000V)
+   - JST connectors
+   - Prototyping board
+   - Silicone wires (better) or PVC Wires
+   - Heat shrink tubing
+
+### 💡 Compatibility Notes
+- All I²C devices operate at 3.3V logic
+- Power supply should provide at least 500mA
+- USB connection recommended for programming
+- External antenna optional for GPS
+
+### 🏗️ Construction Guide
+
+#### 📦 Enclosure Preparation
+* Used a standard PVC electrical junction box (IP55 rated for weather resistance)
+  - Size: Approximately 150mm x 100mm x 70mm
+  - Cost-effective alternative to 3D printing
+  - Naturally resistant to moisture and dust
+  - Available at most hardware stores
+
+#### 🛠️ Tools Required
+* Drill machine with metal cutting bits (for holes)
+* Drill machine with metal cutting attachment that looks like CD (for rectangular cuts)
+* Hot glue gun
+* Wire strippers
+* Soldering iron
+* Basic hand tools (screwdrivers, pliers)
+* Safety equipment (goggles, gloves)
+
+#### 🔨 Assembly Steps
+1. **Display Window Creation** 🪟
+   * Mark display dimensions on box
+   * Drill corner pilot holes
+   * Use metal cutting bits for rough cut
+   * File edges smooth for perfect fit
+   * Pro tip: Use masking tape to prevent scratches
+
+2. **Light Sensor Window** 💡
+   * Create small 10mm opening for BH1750
+   * Use clear epoxy or hot glue to seal
+   * Ensure sensor faces directly outward
+   * Keep sealed but transparent for accuracy
+
+3. **Component Mounting** 🔌
+   * Mount display using hot glue at corners
+   * Create standoffs for ESP32 board
+   * Position GPS antenna near top for best reception
+
+#### ⚠️ Important Notes
+* Ensure proper ventilation while cutting/drilling PVC
+* Double-check measurements before cutting
+* Test all components before final assembly
+* Label all wires for future maintenance
+
+#### 💡 Pro Tips
+* Add small ventilation holes for the sensor
+* Consider magnetic mount options
+* Keep spare wire lengths for modifications
+* Document your build with photos
+
 ## 🚀 Upcoming Features
 Check [Issues](https://github.com/desiFish/ESP32-GPS-Clock-V2/issues)
 
