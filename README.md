@@ -11,6 +11,8 @@
   [![GitHub repo size](https://img.shields.io/github/repo-size/desiFish/ESP32-GPS-Clock-V2)](https://github.com/desiFish/ESP32-GPS-Clock-V2)
 </div>
 
+> Read ⚠️ Important Notice below
+
 ## 🛠️ Hardware Components
 
 ### 📡 Core Components
@@ -120,13 +122,11 @@
    * Create standoffs for ESP32 board
    * Position GPS antenna near top for best reception
 
-#### ⚠️ Important Notes
+#### 💡 Pro Tips
 * Ensure proper ventilation while cutting/drilling PVC
 * Double-check measurements before cutting
 * Test all components before final assembly
 * Label all wires for future maintenance
-
-#### 💡 Pro Tips
 * Add small ventilation holes for the sensor
 * Consider magnetic mount options
 * Keep spare wire lengths for modifications
