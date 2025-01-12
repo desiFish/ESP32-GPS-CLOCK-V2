@@ -149,7 +149,7 @@ Check [Issues](https://github.com/desiFish/ESP32-GPS-Clock-V2/issues)
   <tr>
     <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x11.jpg" alt="inside"></td>
     <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x2.jpg" alt="display-connections"></td>
-    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x3.jpg" alt="aht25"></td>
+    <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x3.jpg" alt="bme280"></td>
   </tr>
   <tr>
     <td><img src="https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/resources/x4.jpg" alt="testing-phase"></td>
