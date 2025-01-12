@@ -59,6 +59,58 @@ Check [Issues](https://github.com/desiFish/ESP32-GPS-Clock-V2/issues)
   </tr>
 </table>
 
+<h2>⚠️ Important Notice</h2>
+<div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; border-left: 5px solid #ffeeba;">
+  <strong>❌ DO NOT USE AHT25 SENSOR!</strong><br>
+  Due to significant accuracy issues, we recommend using BME280/BMP280/TMP117 instead.
+</div> <br>
+<strong>🔋 GPS Battery Modification</strong>
+<div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 10px;">
+  <h4>⚠️ Known Issue with GPS Module's Internal Battery</h4>
+  <p>
+    The NEO-6M GPS modules often come with problematic internal rechargeable batteries that:
+    <ul>
+      <li>Are frequently dead on arrival</li>
+      <li>Fail to hold charge properly</li>
+      <li>Only last 15-20 minutes when disconnected</li>
+      <li>Cannot be reliably recharged</li>
+    </ul>
+  </p>
+
+  <h4>🛠️ Solution Implemented</h4>
+  <p>
+    To resolve this, I've made the following modifications:
+    <ul>
+      <li>Removed the internal battery and charging diode</li>
+      <li>Installed a LiFePO4 battery (AAA size)</li>
+      <li>Added TP5000 charging circuit for reliable charging</li>
+      <li>Implemented BMS for deep discharge protection</li>
+      <li>Added diode to drop voltage to 3V for GPS backup pin</li>
+    </ul>
+  </p>
+
+  <h4>💡 User Options</h4>
+  <div style="background-color: #e2e3e5; padding: 10px; border-radius: 5px;">
+    <strong>You have two choices:</strong>
+    <ol>
+      <li><strong>Keep Original Battery:</strong> 
+        <ul>
+          <li>Suitable if clock remains powered most of the time</li>
+          <li>No modifications needed</li>
+        </ul>
+      </li>
+      <li><strong>Modify Battery (Recommended):</strong>
+        <ul>
+          <li>Better for frequent power cycles</li>
+          <li>Eliminates 5-10 minute GPS lock delay on cold starts</li>
+          <li>More reliable long-term solution</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+</div>
+
+
 ## 📜 License
 
 <details>
