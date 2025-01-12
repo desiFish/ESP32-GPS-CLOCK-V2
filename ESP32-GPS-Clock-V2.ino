@@ -1,5 +1,5 @@
 /*
-  gpsClockV2.ino
+  ESP32-GPS-CLOCK-V2.ino
 
   Copyright (C) 2024 A. Patra
 
