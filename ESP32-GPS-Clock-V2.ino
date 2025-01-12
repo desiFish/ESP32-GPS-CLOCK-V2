@@ -1,7 +1,7 @@
 /*
   ESP32-GPS-CLOCK-V2.ino
 
-  Copyright (C) 2024 A. Patra
+  Copyright (C) 2024 desiFish
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
