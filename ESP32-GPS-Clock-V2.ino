@@ -28,8 +28,20 @@
   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
   ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+/**
+ * Software version number
+ * Format: major.minor.patch
+ */
 #define SWVersion "1.0.1"
-// For basic ESP32 stuff like wifi, OTA Update and Wifi Manager Server
+
+//========== Library Includes ==========//
+/**
+ * Network and OTA Libraries
+ * AsyncTCP: Enables asynchronous TCP operations
+ * ESPAsyncWebServer: Provides web server functionality
+ * ElegantOTA: Handles Over-The-Air updates
+ */
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -50,7 +62,14 @@
 // Data Storage
 #include <Preferences.h>
 
-// display contstructor for ST7920 controlled 128x64 Graphic LCD
+//========== Hardware Configuration ==========//
+/**
+ * Display Configuration
+ * Using ST7920 128x64 LCD with Software SPI
+ * clock=18: Clock signal pin
+ * data=23: Data signal pin
+ * No CS or Reset pins used (U8X8_PIN_NONE)
+ */
 U8G2_ST7920_128X64_F_SW_SPI u8g2(U8G2_R0, /* clock=*/18, /* data=*/23, /* cs=*/U8X8_PIN_NONE, /* reset=*/U8X8_PIN_NONE);
 
 // Preference library object or instance
@@ -62,11 +81,22 @@ float ahtValue; // to store T/RH result
 
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); // sensor address, sensor type
 
-// GPS pins
+//========== Pin Definitions ==========//
+/**
+ * GPS Module Pins
+ * RXPin = 16: Connect to GPS TX
+ * TXPin = 17: Connect to GPS RX
+ */
 static const int RXPin = 16, TXPin = 17;
-// LCD Brightness control
+
+/**
+ * Control Pins
+ * LCD_LIGHT = 4: LCD backlight control (PWM)
+ * BUZZER_PIN = 33: Active buzzer control
+ * NEXT_BUTTON = 36: Menu navigation (ADC input)
+ * SELECT_BUTTON = 39: Menu selection (ADC input)
+ */
 #define LCD_LIGHT 4
-// Others
 #define BUZZER_PIN 33
 #define NEXT_BUTTON 36
 #define SELECT_BUTTON 39
@@ -74,6 +104,12 @@ static const int RXPin = 16, TXPin = 17;
 // GPS instance
 TinyGPSPlus gps;
 
+//========== Global Variables ==========//
+/**
+ * Time/Date Arrays
+ * week[]: Day names for display
+ * monthChar[]: Month names for display
+ */
 String week[7] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 String monthChar[12] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
@@ -345,7 +381,16 @@ time_t prevDisplay = 0; // when the digital clock was displayed
 TaskHandle_t loop1Task;
 
 /**
- * @brief Runs only once during booting
+ * @brief Initialize all hardware and configurations
+ *
+ * Setup sequence:
+ * 1. Initialize Serial communications
+ * 2. Configure GPIO pins
+ * 3. Load saved preferences
+ * 4. Initialize I2C devices
+ * 5. Setup display
+ * 6. Configure WiFi if enabled
+ * 7. Start secondary core task
  */
 void setup(void)
 {
@@ -586,7 +631,14 @@ void setup(void)
 
 /**
  * @brief Secondary loop running on Core 0
- * @param pvParameters Required parameter for FreeRTOS task
+ *
+ * Handles:
+ * - Light sensor readings
+ * - Auto brightness adjustment
+ * - Temperature sensor updates
+ * - Alarm timing and control
+ *
+ * @param pvParameters Required by FreeRTOS
  */
 void loop1(void *pvParameters)
 {
@@ -663,6 +715,16 @@ void loop1(void *pvParameters)
 }
 
 // RUNS ON CORE 1
+/**
+ * @brief Main program loop running on Core 1
+ *
+ * Handles:
+ * - GPS data processing
+ * - Time synchronization
+ * - Display updates
+ * - Menu system
+ * - OTA updates
+ */
 void loop(void)
 {
   if (useWifi)
