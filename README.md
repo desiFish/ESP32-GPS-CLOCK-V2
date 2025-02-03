@@ -11,7 +11,16 @@
   [![GitHub repo size](https://img.shields.io/github/repo-size/desiFish/ESP32-GPS-Clock-V2)](https://github.com/desiFish/ESP32-GPS-Clock-V2)
 </div>
 
-> Read ⚠️ Important Notice below gallery section
+## 📌 Introduction
+
+This project is an enhanced version of [ESP32-GPS-CLOCK-V1](https://github.com/desiFish/ESP32-GPS-CLOCK-V1) with significant improvements:
+
+- **Added Buttons**: Physical buttons for easy interaction with the device.
+- **Menu System**: A comprehensive menu system for configuration and control.
+- **Enhanced User Interface**: Improved display layouts and information presentation.
+- **Additional Features**: New functionalities building upon the original project.
+
+> Read ⚠️ Important Notice below gallery section for critical information about components and modifications.
 
 ## 🛠️ Hardware Components
 

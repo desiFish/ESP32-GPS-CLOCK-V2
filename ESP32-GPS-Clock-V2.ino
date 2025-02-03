@@ -1,6 +1,9 @@
 /*
   ESP32-GPS-CLOCK-V2.ino
 
+  This is an enhanced version of https://github.com/desiFish/ESP32-GPS-CLOCK-V1
+  with added buttons and menu system for improved user interaction and control.
+
   Copyright (C) 2024 desiFish
 
   This program is free software: you can redistribute it and/or modify
