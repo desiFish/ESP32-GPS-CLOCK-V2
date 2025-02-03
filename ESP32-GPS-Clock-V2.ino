@@ -21,7 +21,7 @@
  * Software version number
  * Format: major.minor.patch
  */
-#define SWVersion "1.0.2"
+#define SWVersion "1.1.0"
 
 //========== Library Includes ==========//
 /**
@@ -367,6 +367,7 @@ time_t prevDisplay = 0; // when the digital clock was displayed
 
 // for creating task attached to CORE 0 of CPU
 TaskHandle_t loop1Task;
+byte currentBrightness = 250; // Track current brightness level
 
 /**
  * @brief Initialize all hardware and configurations
@@ -655,17 +656,38 @@ void loop1(void *pvParameters)
       // Brightness control
       if (autoBright)
       {
+        byte targetBrightness;
         if (lux == 0)
-          analogWrite(LCD_LIGHT, 1);
+        {
+          targetBrightness = 5;
+        }
         else
         {
-          byte val1 = constrain(lux, 1, 120);     // constrain(number to constrain, lower end, upper end)
-          byte val3 = map(val1, 1, 120, 20, 255); // map(value, fromLow, fromHigh, toLow, toHigh);  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-          LCD_BRIGHTNESS = val3;
-          Serial.println("LUX: ");
-          Serial.println(val3);
-          analogWrite(LCD_LIGHT, LCD_BRIGHTNESS);
+          byte val1 = constrain(lux, 1, 120);
+          targetBrightness = map(val1, 1, 120, 40, 255);
         }
+
+        // Improved smooth transition with dynamic step size
+        if (currentBrightness != targetBrightness)
+        {
+          int diff = targetBrightness - currentBrightness;
+          // Calculate step size based on difference
+          // Larger differences = larger steps, smaller differences = smaller steps
+          byte stepSize = max(1, min(abs(diff) / 4, 15));
+
+          if (diff > 0)
+          {
+            currentBrightness = min(255, currentBrightness + stepSize);
+          }
+          else
+          {
+            currentBrightness = max(5, currentBrightness - stepSize);
+          }
+        }
+
+        Serial.println("Brightness: ");
+        Serial.println(currentBrightness);
+        analogWrite(LCD_LIGHT, currentBrightness);
       }
 
       lastTime1 = millis();
@@ -702,7 +724,6 @@ void loop1(void *pvParameters)
   }
 }
 
-// RUNS ON CORE 1
 /**
  * @brief Main program loop running on Core 1
  *
@@ -718,7 +739,7 @@ void loop(void)
   if (useWifi)
     ElegantOTA.loop();
 
-  while (gps.hdop.hdop() > 30 && gps.satellites.value() < 4)
+  while (gps.hdop.hdop() > 100 && gps.satellites.value() < 2)
   {
     gpsInfo("Waiting for GPS...");
   }
