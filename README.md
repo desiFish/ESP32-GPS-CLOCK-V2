@@ -70,7 +70,7 @@ This project is an enhanced version of [ESP32-GPS-CLOCK-V1](https://github.com/d
 1. **LiFePO4 Battery** 
    - Capacity: 80mAh (AAA size)
    - Nominal voltage: 3.2V
-   - Cycle life: >2000 cycles
+   - Cycle life: >1500 cycles
    - Temperature range: -20°C to 60°C
    - Perfect for GPS backup
 
@@ -79,7 +79,7 @@ This project is an enhanced version of [ESP32-GPS-CLOCK-V1](https://github.com/d
    - Charging current: 0.5-2A
    - Efficiency: >90%
    - Built-in protection features
-   - Auto-detect battery type
+   - For GPS Battery
 
 3. **Battery Protection** 🛡️
    - BMS for single cell
@@ -94,9 +94,8 @@ This project is an enhanced version of [ESP32-GPS-CLOCK-V1](https://github.com/d
 
 ### 💡 Compatibility Notes
 - All I²C devices operate at 3.3V logic
-- Power supply should provide at least 500mA
-- USB connection recommended for programming
-- External antenna optional for GPS
+- Power supply should provide at least 500mA @5V
+- External antenna optional for GPS (Not Implemented)
 
 ### 🏗️ Construction Guide
 
@@ -197,7 +196,7 @@ Check [Issues](https://github.com/desiFish/ESP32-GPS-Clock-V2/issues)
       <li>Removed the internal battery and charging diode</li>
       <li>Installed a LiFePO4 battery (AAA size)</li>
       <li>Added TP5000 charging circuit for reliable charging</li>
-      <li>Implemented BMS for deep discharge protection</li>
+      <li>Implemented BMS for deep discharge protection (Cut Off @2.5V, 2.9V Ideal)</li>
       <li>Added diode to drop voltage to 3V for GPS backup pin</li>
     </ul>
   </p>
