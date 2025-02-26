@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🌟 ESP32-GPS-Clock-V2 ⏰</h1>
+  <h1>🌟 GPS-Clock-V2 ⏰</h1>
   <p><i>A smart GPS Clock with temperature, humidity, and light sensing capabilities</i></p>
   
   [![GitHub license](https://img.shields.io/github/license/desiFish/ESP32-GPS-Clock-V2)](https://github.com/desiFish/ESP32-GPS-Clock-V2/blob/main/LICENSE)
@@ -13,7 +13,7 @@
 
 ## 📌 Introduction
 
-This project is an enhanced version of [ESP32-GPS-CLOCK-V1](https://github.com/desiFish/ESP32-GPS-CLOCK-V1) with significant improvements:
+This project is an enhanced version of [GPS-CLOCK-V1](https://github.com/desiFish/GPS-CLOCK-V1) with significant improvements:
 
 - **Added Buttons**: Physical buttons for easy interaction with the device.
 - **Menu System**: A comprehensive menu system for configuration and control.
