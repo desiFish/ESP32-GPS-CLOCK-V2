@@ -1,7 +1,7 @@
 /*
   ESP32-GPS-CLOCK-V2.ino
 
-  This is an enhanced version of https://github.com/desiFish/ESP32-GPS-CLOCK-V1
+  This is an enhanced version of https://github.com/desiFish/GPS-CLOCK-V2
   with added buttons and menu system for improved user interaction and control.
 
   Copyright (C) 2024 desiFish
@@ -24,7 +24,7 @@
  * Software version number
  * Format: major.minor.patch
  */
-#define SWVersion "1.1.0"
+#define SWVersion "1.1.1"
 
 //========== Library Includes ==========//
 /**
@@ -68,7 +68,7 @@ Preferences pref;
 // Light Sensor Object
 BH1750 lightMeter;
 
-float ahtValue; // to store T/RH result
+float ahtValue; // to store Temp result
 
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); // sensor address, sensor type
 
@@ -112,13 +112,13 @@ int years = 0;
 
 // LUX (BH1750) update frequency
 unsigned long lastTime1 = 0;
-const long timerDelay1 = 3000; // LUX delay
+const long timerDelay1 = 2000; // LUX delay
 
 // AHT25 update frequency
 unsigned long lastTime2 = 0;
 const long timerDelay2 = 12000; // aht update delay
 
-bool isDark = false;
+bool isDark; // Tracks ambient light state
 float ahtTemp = 0.0;
 
 // features config, saved in preference library
@@ -299,7 +299,6 @@ void onOTAStart()
   u8g2.print("HAVE STARTED");
   u8g2.sendBuffer();
   delay(1000);
-  // <Add your own code here>
 }
 
 /**
@@ -480,8 +479,7 @@ void setup(void)
   // wifi manager
   if (useWifi)
   {
-    bool wifiConfigExist = pref.isKey("ssid");
-    if (!wifiConfigExist)
+    if (!(pref.isKey("ssid")))
     {
       pref.putString("ssid", "");
       pref.putString("password", "");
@@ -649,13 +647,8 @@ void loop1(void *pvParameters)
       Serial.println("LUXRaw: ");
       Serial.println(lux);
 
-      if (muteDark)
-      { // is mute on dark enabled by user
-        if (lux <= 2)
-          isDark = true;
-        else
-          isDark = false;
-      }
+      isDark = muteDark && (lux <= 2); // Check if it's dark only if muteDark is enabled
+
       // Brightness control
       if (autoBright)
       {
@@ -690,37 +683,30 @@ void loop1(void *pvParameters)
 
         Serial.println("Brightness: ");
         Serial.println(currentBrightness);
-        analogWrite(LCD_LIGHT, currentBrightness);
+        analogWrite(LCD_LIGHT, currentBrightness); // set brightness
       }
 
       lastTime1 = millis();
     }
+
     if ((millis() - lastTime2) > timerDelay2)
     {
-
       ahtTemp = (aht20.readTemperature()) - 3;
-
       lastTime2 = millis();
     }
 
-    if (!isDark)
-    { // if mute on dark is not active (or false)
-      if (hourlyAlarm || halfHourlyAlarm)
+    if (!isDark && seconds == 0 && (hourlyAlarm || halfHourlyAlarm)) // Only check when seconds is 0
+    {
+      switch (minutes)
       {
+      case 0:
         if (hourlyAlarm)
-        {
-          if ((minutes == 0) && (seconds == 0))
-          {
-            buzzer(600, 1);
-          }
-        }
+          buzzer(600, 1);
+        break;
+      case 30:
         if (halfHourlyAlarm)
-        {
-          if ((minutes == 30) && (seconds == 0))
-          {
-            buzzer(400, 2);
-          }
-        }
+          buzzer(400, 2);
+        break;
       }
     }
     delay(100);
