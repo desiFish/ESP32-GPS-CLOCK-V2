@@ -385,6 +385,8 @@ byte currentBrightness = 250; // Track current brightness level
  */
 void setup(void)
 {
+  if (getCpuFrequencyMhz() != 160)
+    setCpuFrequencyMhz(160); // if not 160MHz, set to 160MHz
   Serial.begin(115200);
   Serial1.begin(9600, SERIAL_8N1, RXPin, TXPin); // for GPS running on Hardware Serial
   pinMode(LCD_LIGHT, OUTPUT);
@@ -541,7 +543,7 @@ void setup(void)
 
     WiFi.mode(WIFI_STA);
     WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-    WiFi.setHostname("Mini GClock");
+    WiFi.setHostname("MiniGPSClock");
     WiFi.begin(ssid.c_str(), password.c_str());
     Serial.println("");
 
@@ -555,7 +557,7 @@ void setup(void)
 
     // count variable stores the status of WiFi connection. 0 means NOT CONNECTED. 1 means CONNECTED
 
-    bool count = 1;
+    bool count = true;
     while (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
       u8g2.clearBuffer();
@@ -571,7 +573,7 @@ void setup(void)
       u8g2.sendBuffer();
       Serial.println("Connection Failed");
       delay(6000);
-      count = 0;
+      count = false;
       break;
     }
     if (count)
@@ -647,7 +649,7 @@ void loop1(void *pvParameters)
       Serial.println("LUXRaw: ");
       Serial.println(lux);
 
-      isDark = muteDark && (lux <= 2); // Check if it's dark only if muteDark is enabled
+      isDark = muteDark && (lux <= 1); // Check if it's dark only if muteDark is enabled
 
       // Brightness control
       if (autoBright)
@@ -809,8 +811,8 @@ void loop(void)
 
         u8g2.drawLine(0, 31, 127, 31);
 
-        if (days == 14 && months == 11)
-        { // special message on birthday
+        if (days == 14 && months == 11) // set these to ZERO to disable birthday message
+        {                               // special message on birthday
           u8g2.setFont(u8g2_font_6x13_tr);
           u8g2.setCursor(5, 43);
           u8g2.print("HAPPY BIRTHDAY MINI!");
@@ -841,10 +843,7 @@ void loop(void)
           u8g2.print(seconds);
 
           u8g2.setCursor(95, 63);
-          if (!isAM())
-            u8g2.print("PM");
-          else
-            u8g2.print("AM");
+          u8g2.print(isAM() ? "AM" : "PM");
 
           u8g2.setFont(u8g2_font_waffle_t_all);
           if (!isDark)
@@ -854,8 +853,6 @@ void loop(void)
           }
           if (useWifi)
             u8g2.drawUTF8(5, 64, "\ue2b5"); // wifi-active symbol
-
-          u8g2.sendBuffer();
         }
         else
         {
@@ -881,10 +878,7 @@ void loop(void)
           u8g2.print(seconds);
 
           u8g2.setCursor(105, 63);
-          if (!isAM())
-            u8g2.print("PM");
-          else
-            u8g2.print("AM");
+          u8g2.print(isAM() ? "AM" : "PM");
 
           u8g2.setFont(u8g2_font_waffle_t_all);
           if (!isDark)
@@ -895,14 +889,9 @@ void loop(void)
 
           if (useWifi)
             u8g2.drawUTF8(112, 52, "\ue2b5"); // wifi-active symbol
-
-          u8g2.sendBuffer();
         }
-
-        if (pulse == 1)
-          pulse = 0;
-        else if (pulse == 0)
-          pulse = 1;
+        u8g2.sendBuffer();
+        pulse = !pulse;
       }
     }
 
