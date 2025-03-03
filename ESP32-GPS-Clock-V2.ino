@@ -388,14 +388,26 @@ void setup(void)
   if (getCpuFrequencyMhz() != 160)
     setCpuFrequencyMhz(160); // if not 160MHz, set to 160MHz
   Serial.begin(115200);
+  Wire.begin();
   Serial1.begin(9600, SERIAL_8N1, RXPin, TXPin); // for GPS running on Hardware Serial
   pinMode(LCD_LIGHT, OUTPUT);
-  analogWrite(LCD_LIGHT, 250);
+  analogWrite(LCD_LIGHT, 50);
 
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, HIGH);
-  delay(100);
+  delay(50);
   digitalWrite(BUZZER_PIN, LOW);
+
+  analogWrite(LCD_LIGHT, 250);
+
+  u8g2.begin();
+  u8g2.clearBuffer();
+  u8g2.drawLine(0, 17, 127, 17);
+  u8g2.setFont(u8g2_font_7x14B_mr);
+  u8g2.setCursor(12, 30);
+  u8g2.print("GPS Clock V2");
+  u8g2.drawLine(0, 31, 127, 31);
+  u8g2.sendBuffer();
 
   if (!pref.begin("database", false)) // open database
     errorMsgPrint("DATABASE", "ERROR INITIALIZE");
@@ -449,9 +461,6 @@ void setup(void)
   }
   buzzVol = pref.getInt("buzzVol", 50);
 
-  analogWrite(LCD_LIGHT, LCD_BRIGHTNESS);
-  Wire.begin();
-
   if (!lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
     errorMsgPrint("BH1750", "CANNOT FIND");
 
@@ -459,14 +468,7 @@ void setup(void)
   {
     errorMsgPrint("AHT25", "CANNOT FIND");
   }
-  u8g2.begin();
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_7x14B_mr);
-  u8g2.setCursor(12, 15);
-  u8g2.print("RETRO");
-  u8g2.setCursor(12, 30);
-  u8g2.print("GPS CLOCK");
-  u8g2.sendBuffer();
+
   xTaskCreatePinnedToCore(
       loop1,       /* Task function. */
       "loop1Task", /* name of task. */
@@ -476,7 +478,7 @@ void setup(void)
       &loop1Task,  /* Task handle to keep track of created task */
       0);          /* pin task to core 0 */
 
-  delay(2500);
+  delay(1000);
 
   // wifi manager
   if (useWifi)
@@ -615,7 +617,7 @@ void setup(void)
   u8g2.setFont(u8g2_font_streamline_food_drink_t);
   u8g2.drawUTF8(80, 54, "U+4"); // birthday cake icon
   u8g2.sendBuffer();
-  delay(2500);
+  delay(2000);
 
   pref.end();
   ahtTemp = (aht20.readTemperature() - 3); // NEED TO CHANGE THE SENSOR, it shows +3 degrees extra
