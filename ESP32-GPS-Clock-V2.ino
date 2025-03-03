@@ -24,7 +24,7 @@
  * Software version number
  * Format: major.minor.patch
  */
-#define SWVersion "1.1.1"
+#define SWVersion "1.1.2"
 
 //========== Library Includes ==========//
 /**
