@@ -1901,7 +1901,7 @@ void WiFiEvent(WiFiEvent_t event)
     u8g2.setCursor(1, 22);
     u8g2.print("192.168.4.1/wifi");
     u8g2.setCursor(1, 34);
-    u8g2.print("Enter the your Wifi");
+    u8g2.print("Enter your Wifi");
     u8g2.setCursor(1, 46);
     u8g2.print("credentials of 2.4Ghz");
     u8g2.setCursor(1, 58);
