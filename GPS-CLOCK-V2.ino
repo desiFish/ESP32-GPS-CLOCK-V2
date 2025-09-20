@@ -24,7 +24,7 @@
  * Software version number
  * Format: major.minor.patch
  */
-#define SWVersion "1.1.2"
+#define SWVersion "1.1.3"
 
 //========== Library Includes ==========//
 /**
@@ -699,7 +699,7 @@ void loop1(void *pvParameters)
       lastTime2 = millis();
     }
 
-    if (!isDark && seconds == 0 && (hourlyAlarm || halfHourlyAlarm)) // Only check when seconds is 0
+    if (!isDark && years > 2000 && seconds == 0 && (hourlyAlarm || halfHourlyAlarm)) // Only check when seconds is 0
     {
       switch (minutes)
       {
