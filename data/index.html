@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Wi-Fi Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <style>
+        .button-save {
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            padding: 15px 32px;
+            text-align: center;
+            font-size: 16px;
+            width: 200px;
+            border-radius: 4px;
+            transition-duration: 0.4s;
+            cursor: pointer;
+        }
+
+        .button-save:hover {
+            background-color: #218838;
+        }
+
+        html {
+            font-family: Arial, Helvetica, sans-serif;
+            display: inline-block;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: white;
+        }
+
+        p {
+            font-size: 1.4rem;
+        }
+
+        .topnav {
+            overflow: hidden;
+            background-color: #0A1128;
+        }
+
+        body {
+            margin: 0;
+        }
+
+        .content {
+            padding: 5%;
+        }
+
+        .card-grid {
+            max-width: 800px;
+            margin: 0 auto;
+            display: grid;
+            grid-gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .card {
+            background-color: white;
+            box-shadow: 2px 2px 12px 1px rgba(140, 140, 140, .5);
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #034078
+        }
+
+        input[type=submit] {
+            border: none;
+            color: #FEFCFB;
+            background-color: #034078;
+            padding: 15px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            width: 100px;
+            margin-right: 10px;
+            border-radius: 4px;
+            transition-duration: 0.4s;
+        }
+
+        input[type=submit]:hover {
+            background-color: #1282A2;
+        }
+
+        input[type=text],
+        input[type=number],
+        select {
+            width: 50%;
+            padding: 12px 20px;
+            margin: 18px;
+            display: inline-block;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        label {
+            font-size: 1.2rem;
+        }
+
+        .value {
+            font-size: 1.2rem;
+            color: #1282A2;
+        }
+
+        .button-save:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="topnav">
+        <h1>Wi-Fi Manager</h1>
+    </div>
+    <div class="content">
+        <div class="card-grid">
+            <div class="card">
+                <form id="wifiForm">
+                    <p>
+                        <label for="ssid">SSID</label>
+                        <input type="text" id="ssid" name="ssid"><br>
+                        <label for="pass">Password</label>
+                        <input type="text" id="pass" name="pass"><br>
+                    <div style="text-align:center;">
+                        <button type="submit" class="button-save">Submit</button>
+                    </div>
+                    </p>
+                </form>
+                <div id="status" class="state"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Fetch current WiFi credentials
+        fetch('/api/wifi/creds')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('ssid').value = data.ssid || '';
+                document.getElementById('pass').value = data.password || '';
+            });
+
+        document.getElementById('wifiForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const ssid = document.getElementById('ssid').value.trim();
+            const pass = document.getElementById('pass').value.trim();
+            const statusDiv = document.getElementById('status');
+            if (!ssid || !pass) {
+                statusDiv.textContent = 'SSID and Password cannot be empty!';
+                return;
+            }
+            // Show saving message and disable form
+            statusDiv.textContent = 'Saving...';
+            const form = document.getElementById('wifiForm');
+            form.querySelectorAll('input, button').forEach(el => el.disabled = true);
+
+            fetch('/api/wifi/creds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ssid: ssid, password: pass }),
+                keepalive: true
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        statusDiv.textContent = 'Saved! Device will reboot...';
+                        alert('WiFi credentials saved successfully!\nDevice is rebooting...\nPlease wait and reconnect to your WiFi network.');
+                        // Clear form and show reconnection instructions
+                        form.reset();
+                        setTimeout(() => {
+                            statusDiv.textContent = 'Device is rebooting. It will connect to your WiFi network.';
+                        }, 1500);
+                    } else {
+                        statusDiv.textContent = data.error || 'Error saving credentials';
+                        // Re-enable form on error
+                        form.querySelectorAll('input, button').forEach(el => el.disabled = false);
+                    }
+                })
+                .catch(() => {
+                    // This might happen when device reboots, so keep the positive message
+                    setTimeout(() => {
+                        statusDiv.textContent = 'Device is rebooting. Please connect to your WiFi network.';
+                    }, 1500);
+                });
+        });
+    </script>
+</body>
+
+</html>
