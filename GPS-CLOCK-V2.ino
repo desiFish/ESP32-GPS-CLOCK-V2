@@ -4,7 +4,7 @@
   This is an enhanced version of https://github.com/desiFish/GPS-CLOCK-V2
   with added buttons and menu system for improved user interaction and control.
 
-  Copyright (C) 2024 desiFish
+  Copyright (C) 2024-2025 desiFish
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
  * Software version number
  * Format: major.minor.patch
  */
-#define SWVersion "1.2.0"
+#define SWVersion "2.0.0"
 
 //========== Library Includes ==========//
 /**
@@ -48,8 +48,7 @@
 
 // GPS and Timing
 #include <TinyGPSPlus.h>
-#include <TimeLib.h>
-
+#include <time.h>
 // Data Storage
 #include <Preferences.h>
 // JSON handling
@@ -80,6 +79,10 @@ BH1750 lightMeter;
 float ahtValue; // to store Temp result
 
 AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); // sensor address, sensor type
+
+// Time related
+time_t currentEpoch;
+struct tm timeinfo;
 
 //========== Pin Definitions ==========//
 /**
@@ -113,19 +116,17 @@ TinyGPSPlus gps;
 String week[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 String monthChar[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-// used for blinking ":" in time (for display)
-byte pulse = 0;
 // variables for holding time data globally
 byte days = 0, months = 0, hours = 0, minutes = 0, seconds = 0;
 int years = 0;
 
 // LUX (BH1750) update frequency
 unsigned long lastTime1 = 0;
-const long timerDelay1 = 2000; // LUX delay
+int timerDelay1 = 2000; // Light Sensor update delay
 
 // AHT25 update frequency
 unsigned long lastTime2 = 0;
-const long timerDelay2 = 12000; // aht update delay
+const long timerDelay2 = 12000; // temperature sensor update delay
 
 bool isDark; // Tracks ambient light state
 float ahtTemp = 0.0;
@@ -133,7 +134,7 @@ int ahtHum = 0;
 
 // features config, saved in preference library
 int LCD_BRIGHTNESS, buzzVol;
-bool autoBright, hourlyAlarm, halfHourlyAlarm, useWifi, muteDark, offInDark;
+bool autoBright, hourlyAlarm, halfHourlyAlarm, useWifi, muteDark, offInDark, hour12Mode;
 
 // your wifi name and password (saved in preference library)
 String ssid;
@@ -359,6 +360,10 @@ void setupWebServer()
  */
 void setup(void)
 {
+  Serial.begin(115200);
+  Wire.begin();
+  Serial1.begin(9600, SERIAL_8N1, RXPin, TXPin); // for GPS running on Hardware Serial
+
   // --- LittleFS Init ---
   if (!LittleFS.begin())
   {
@@ -382,19 +387,10 @@ void setup(void)
     Serial.println("LittleFS mounted successfully!");
   }
 
-  if (getCpuFrequencyMhz() != 240)
-    setCpuFrequencyMhz(240); // if not 160MHz, set to 160MHz
-  Serial.begin(115200);
-  Wire.begin();
-  Serial1.begin(9600, SERIAL_8N1, RXPin, TXPin); // for GPS running on Hardware Serial
   pinMode(LCD_LIGHT, OUTPUT);
-
   pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, HIGH);
-  delay(20);
-  digitalWrite(BUZZER_PIN, LOW);
 
-  analogWrite(LCD_LIGHT, 250);
+  analogWrite(LCD_LIGHT, 150);
 
   u8g2.begin();
   u8g2.clearBuffer();
@@ -404,6 +400,7 @@ void setup(void)
   u8g2.print("GPS Clock V2");
   u8g2.drawLine(0, 31, 127, 31);
   u8g2.sendBuffer();
+  delay(1000);
 
   if (!pref.begin("database", false)) // open database
     errorMsgPrint("DATABASE", "ERROR INITIALIZE");
@@ -416,21 +413,21 @@ void setup(void)
 
   if (!pref.isKey("autoBright"))
   {
-    pref.putBool("autoBright", false);
+    pref.putBool("autoBright", true);
   }
-  autoBright = pref.getBool("autoBright", false);
+  autoBright = pref.getBool("autoBright", true);
 
   if (!pref.isKey("hourlyAlarm"))
   {
-    pref.putBool("hourlyAlarm", false);
+    pref.putBool("hourlyAlarm", true);
   }
-  hourlyAlarm = pref.getBool("hourlyAlarm", false);
+  hourlyAlarm = pref.getBool("hourlyAlarm", true);
 
   if (!pref.isKey("halfHourlyAlarm"))
   {
-    pref.putBool("halfHourlyAlarm", false);
+    pref.putBool("halfHourlyAlarm", true);
   }
-  halfHourlyAlarm = pref.getBool("halfHourlyAlarm", false);
+  halfHourlyAlarm = pref.getBool("halfHourlyAlarm", true);
 
   if (!pref.isKey("useWifi"))
   {
@@ -440,21 +437,30 @@ void setup(void)
 
   if (!pref.isKey("muteDark"))
   {
-    pref.putBool("muteDark", false);
+    pref.putBool("muteDark", true);
   }
-  muteDark = pref.getBool("muteDark", false);
+  muteDark = pref.getBool("muteDark", true);
 
   if (!pref.isKey("buzzVol"))
   {
-    pref.putInt("buzzVol", 50);
+    pref.putInt("buzzVol", 255);
   }
-  buzzVol = pref.getInt("buzzVol", 50);
+  buzzVol = pref.getInt("buzzVol", 255);
+  analogWrite(BUZZER_PIN, buzzVol);
+  delay(20);
+  analogWrite(BUZZER_PIN, 0);
 
   if (!pref.isKey("offInDark"))
   {
-    pref.putBool("offInDark", false);
+    pref.putBool("offInDark", true);
   }
-  offInDark = pref.getBool("offInDark", false);
+  offInDark = pref.getBool("offInDark", true);
+
+  if (!pref.isKey("hour12Mode"))
+  {
+    pref.putBool("hour12Mode", true);
+  }
+  hour12Mode = pref.getBool("hour12Mode", true);
 
   if (!lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
     errorMsgPrint("BH1750", "CANNOT FIND");
@@ -463,18 +469,6 @@ void setup(void)
   {
     errorMsgPrint("AHT25", "CANNOT FIND");
   }
-
-  xTaskCreatePinnedToCore(
-      loop1,       /* Task function. */
-      "loop1Task", /* name of task. */
-      10000,       /* Stack size of task */
-      NULL,        /* parameter of the task */
-      1,           /* priority of the task */
-      &loop1Task,  /* Task handle to keep track of created task */
-      0);          /* pin task to core 0 */
-
-  delay(1000);
-
   // wifi manager
   if (useWifi)
   {
@@ -572,30 +566,43 @@ void setup(void)
   u8g2.setFont(u8g2_font_streamline_food_drink_t);
   u8g2.drawUTF8(80, 54, "U+4"); // birthday cake icon
   u8g2.sendBuffer();
-  delay(2000);
+  delay(1500);
   pref.end();
   ahtTemp = aht20.readTemperature(); // NEED TO CHANGE THE SENSOR, it shows +3 degrees extra
   ahtHum = aht20.readHumidity();
+  xTaskCreatePinnedToCore(
+      loop1,                              /* Task function. */
+      "loop1Task",                        /* name of task. */
+      10000,                              /* Stack size of task */
+      NULL,                               /* parameter of the task */
+      1,                                  /* priority of the task */
+      &loop1Task,                         /* Task handle to keep track of created task */
+      0);                                 /* pin task to core 0 */
   analogWrite(LCD_LIGHT, LCD_BRIGHTNESS); // set brightness
+  delay(100);
 }
 
 /**
  * @brief Secondary loop running on Core 0
  *
- * Handles:
- * - Light sensor readings
- * - Auto brightness adjustment
- * - Temperature sensor updates
- * - Alarm timing and control
+ * Responsibilities:
+ * - Periodically read the light sensor (BH1750) and update ambient light state.
+ * - Adjust LCD brightness automatically and smoothly if enabled.
+ * - Read temperature and humidity from the AHT sensor at intervals.
+ * - Trigger alarms (hourly/half-hourly) and buzzer as needed.
+ * - Perform power-saving operations based on ambient light and settings.
  *
  * @param pvParameters Required by FreeRTOS
  */
 void loop1(void *pvParameters)
 {
+  Serial.println("[DEBUG] loop1: Started on Core 0");
   for (;;)
   {
     if ((millis() - lastTime1) > timerDelay1)
-    { // light sensor based power saving operations
+    {
+      timerDelay1 = 4000;
+      Serial.println("[DEBUG] loop1: Reading light sensor...");
       lightMeter.configure(BH1750::ONE_TIME_HIGH_RES_MODE);
       float lux;
       while (!lightMeter.measurementReady(true))
@@ -604,14 +611,17 @@ void loop1(void *pvParameters)
       }
       lux = lightMeter.readLightLevel();
 
-      Serial.println("LUXRaw: ");
+      Serial.print("[DEBUG] loop1: LUXRaw = ");
       Serial.println(lux);
 
-      isDark = lux <= 1; // Check if it's dark only if muteDark is enabled
+      isDark = lux <= 1; // Consider it dark if LUX is 1 or below
 
-      // Brightness control
       if (autoBright)
       {
+        Serial.print("[DEBUG] loop1: autoBright enabled, isDark=");
+        Serial.print(isDark);
+        Serial.print(", offInDark=");
+        Serial.println(offInDark);
         if (isDark && offInDark)
         {
           currentBrightness = 0; // Set to minimum brightness in dark if offInDark is enabled
@@ -620,16 +630,14 @@ void loop1(void *pvParameters)
         {
           byte targetBrightness;
           byte val1 = constrain(lux, 1, 120);
-          targetBrightness = map(val1, 1, 120, 40, 255);
-
-          // Improved smooth transition with dynamic step size
+          targetBrightness = map(val1, 1, 120, 10, 255);
           if (currentBrightness != targetBrightness)
           {
+            timerDelay1 = 200; // Faster updates during transition
             int diff = targetBrightness - currentBrightness;
             // Calculate step size based on difference
             // Larger differences = larger steps, smaller differences = smaller steps
             byte stepSize = max(1, min(abs(diff) / 4, 15));
-
             if (diff > 0)
             {
               currentBrightness = min(255, currentBrightness + stepSize);
@@ -638,11 +646,13 @@ void loop1(void *pvParameters)
             {
               currentBrightness = max(5, currentBrightness - stepSize);
             }
+            Serial.print("[DEBUG] loop1: Adjusting brightness, current=");
+            Serial.print(currentBrightness);
+            Serial.print(", target=");
+            Serial.println(targetBrightness);
           }
         }
-        Serial.println("Brightness: ");
-        Serial.println(currentBrightness);
-        analogWrite(LCD_LIGHT, currentBrightness); // set brightness
+        analogWrite(LCD_LIGHT, currentBrightness);
       }
 
       lastTime1 = millis();
@@ -650,63 +660,79 @@ void loop1(void *pvParameters)
 
     if ((millis() - lastTime2) > timerDelay2)
     {
-      ahtTemp = aht20.readTemperature();
-      ahtHum = aht20.readHumidity();
+      if (!(isDark && offInDark)) // Only read sensor if not in dark mode with offInDark enabled
+      {
+        Serial.println("[DEBUG] loop1: Reading temperature/humidity sensor...");
+        ahtTemp = aht20.readTemperature();
+        ahtHum = aht20.readHumidity();
+        Serial.print("[DEBUG] loop1: Temp=");
+        Serial.print(ahtTemp);
+        Serial.print(", Hum=");
+        Serial.println(ahtHum);
+      }
       lastTime2 = millis();
     }
 
-    if (!(isDark && muteDark) && years > 2024 && seconds == 0 && (hourlyAlarm || halfHourlyAlarm)) // Only check when seconds is 0
+    if (!(isDark && muteDark) && years > 2024 && seconds == 0 && (hourlyAlarm || halfHourlyAlarm))
     {
-      switch (minutes)
+      if (minutes == 0 && hourlyAlarm)
       {
-      case 0:
-        if (hourlyAlarm)
-          buzzer(600, 1);
-        break;
-      case 30:
-        if (halfHourlyAlarm)
-          buzzer(400, 2);
-        break;
+        Serial.print("[DEBUG] loop1: Hourly alarm triggered at ");
+        Serial.print(hours);
+        Serial.print(":");
+        Serial.println(minutes);
+        buzzer(600, 1);
+      }
+      else if (minutes == 30 && halfHourlyAlarm)
+      {
+        Serial.print("[DEBUG] loop1: Half-hourly alarm triggered at ");
+        Serial.print(hours);
+        Serial.print(":");
+        Serial.println(minutes);
+        buzzer(400, 2);
       }
     }
-    delay(100);
+    delay(50);
   }
 }
 
 /**
  * @brief Main program loop running on Core 1
  *
- * Handles:
- * - GPS data processing
- * - Time synchronization
- * - Display updates
- * - Menu system
- * - OTA updates
+ * Responsibilities:
+ * - Handles GPS data processing and time synchronization
+ * - Adjusts global time variables to IST immediately after GPS update
+ * - Updates the display with current time, date, and sensor data
+ * - Manages the menu system and user input
+ * - Handles OTA updates and WiFi events if enabled
+ * - Manages power-saving (dark mode) and display state
  */
 void loop(void)
 {
-  if (useWifi)
-    ElegantOTA.loop();
-
+  // used for blinking ":" in time (for display)
+  static bool pulse = true;
   static bool wasInDarkMode = false;
+
+  if (WiFi.status() == WL_CONNECTED)
+    ElegantOTA.loop();
 
   if (offInDark && isDark)
   {
     if (!wasInDarkMode)
     {
-      // Entering dark mode
+      Serial.println("[DEBUG] loop: Entering dark mode (display off, CPU slow)");
       wasInDarkMode = true;
-      setCpuFrequencyMhz(80); // Lower CPU frequency
+      setCpuFrequencyMhz(10); // Lower CPU frequency
       u8g2.clearBuffer();     // Clear display
       u8g2.setPowerSave(1);   // Turn off display
       Serial1.flush();        // Clear any pending GPS data
     }
-    delay(1000); // Longer delay in dark mode to save power
+    delay(1000);
     return;
   }
   else if (wasInDarkMode)
   {
-    // Exiting dark mode
+    Serial.println("[DEBUG] loop: Exiting dark mode (display on, CPU normal)");
     wasInDarkMode = false;
     setCpuFrequencyMhz(240); // Restore CPU frequency
     u8g2.setPowerSave(0);    // Turn on display
@@ -714,9 +740,10 @@ void loop(void)
 
   while (gps.hdop.hdop() > 100 && gps.satellites.value() < 2)
   {
+    Serial.println("[DEBUG] loop: Waiting for GPS fix...");
     gpsInfo("Waiting for GPS...");
   }
-
+  const char *ampmStr;
   while (Serial1.available())
   {
     if (gps.encode(Serial1.read()))
@@ -725,117 +752,136 @@ void loop(void)
       unsigned long age = gps.time.age();
       if (age < 500)
       {
-        // set the Time according to the latest GPS reading
-        setTime(gps.time.hour(), gps.time.minute(), gps.time.second(), gps.date.day(), gps.date.month(), gps.date.year());
-        adjustTime(19800);
+        // Build tm struct with GPS UTC
+        struct tm tmUTC = {};
+        int gpsYear = gps.date.year();
+        tmUTC.tm_year = gpsYear - 1900;      // struct tm wants "years since 1900"
+        tmUTC.tm_mon = gps.date.month() - 1; // months 0-11
+        tmUTC.tm_mday = gps.date.day();
+        tmUTC.tm_hour = gps.time.hour();
+        tmUTC.tm_min = gps.time.minute();
+        tmUTC.tm_sec = gps.time.second();
+
+        // Convert to epoch (UTC)
+        time_t t = mktime(&tmUTC);
+
+        // Apply IST offset (+5:30 → 19800 seconds)
+        t += 19800;
+
+        // Save epoch and also convert to broken-down local time
+        currentEpoch = t;
+        localtime_r(&t, &timeinfo);
+
+        // Update globals for your display
+        days = timeinfo.tm_mday;
+        months = timeinfo.tm_mon + 1;
+        years = timeinfo.tm_year + 1900;
+        minutes = timeinfo.tm_min;
+        seconds = timeinfo.tm_sec;
+
+        // Convert to 12-hour format
+        byte hour12 = timeinfo.tm_hour % 12;
+        if (hour12 == 0)
+          hour12 = 12; // midnight or noon → 12
+        const char *ampm = (timeinfo.tm_hour < 12) ? "AM" : "PM";
+
+        // If you want globals for 12h format:
+        hours = hour12Mode ? hour12 : timeinfo.tm_hour;
+        ampmStr = hour12Mode ? ampm : "";
       }
     }
   }
 
-  if (!wasInDarkMode)
-  { // Only update time variables if not in dark mode
-    days = day();
-    months = month();
-    years = year();
-    hours = hourFormat12();
-    minutes = minute();
-    seconds = second();
-  }
-
   if (!updateInProgress)
   {
-    if (timeStatus() != timeNotSet)
+    static time_t prevEpoch = 0;
+    if (currentEpoch != prevEpoch)
     {
-      if (now() != prevDisplay)
-      { // update the display only if the time has changed
-        prevDisplay = now();
-        u8g2.clearBuffer();
-        u8g2.setFont(u8g2_font_t0_11_tf);
-        u8g2.setCursor(2, 13);
-        u8g2.print(String(ahtTemp, 1)); // Show temperature with 1 decimal place
-        u8g2.setFont(u8g2_font_threepix_tr);
-        u8g2.setCursor(28, 8);
-        u8g2.print("o");
-        u8g2.setFont(u8g2_font_t0_11_tf);
-        u8g2.setCursor(32, 13);
-        u8g2.print("C ");
-        String temp = String(1008) + "hPa";               // Ensure font is set
-        int stringWidth = u8g2.getStrWidth(temp.c_str()); // Get exact pixel width
-        u8g2.setCursor((128 - stringWidth) / 2, 13);      // Center using screen width
-        u8g2.print(temp);
-        if (ahtHum > 99)
-          u8g2.setCursor(90, 13);
-        else
-          u8g2.setCursor(96, 13);
-        u8g2.print(ahtHum);
-        u8g2.print("%rH");
+      prevEpoch = currentEpoch;
+      Serial.println("[DEBUG] loop: Updating display");
+      u8g2.clearBuffer();
+      u8g2.setFont(u8g2_font_t0_11_tf);
+      u8g2.setCursor(2, 13);
+      u8g2.print(String(ahtTemp, 1)); // Show temperature with 1 decimal place
+      u8g2.setFont(u8g2_font_threepix_tr);
+      u8g2.setCursor(28, 8);
+      u8g2.print("o");
+      u8g2.setFont(u8g2_font_t0_11_tf);
+      u8g2.setCursor(32, 13);
+      u8g2.print("C ");
+      String temp = String(1008) + "hPa";               // Ensure font is set
+      int stringWidth = u8g2.getStrWidth(temp.c_str()); // Get exact pixel width
+      u8g2.setCursor((128 - stringWidth) / 2, 13);      // Center using screen width
+      u8g2.print(temp);
+      if (ahtHum > 99)
+        u8g2.setCursor(90, 13);
+      else
+        u8g2.setCursor(96, 13);
+      u8g2.print(ahtHum);
+      u8g2.print("%rH");
 
-        u8g2.drawLine(0, 17, 127, 17);
-        u8g2.setFont(u8g2_font_samim_12_t_all); // u8g2_font_t0_11_mf  u8g2_font_t0_16_mr
-        u8g2.setCursor(4, 29);
-        if (days < 10)
+      u8g2.drawLine(0, 17, 127, 17);
+      u8g2.setFont(u8g2_font_samim_12_t_all); // u8g2_font_t0_11_mf  u8g2_font_t0_16_mr
+      u8g2.setCursor(4, 29);
+      if (days < 10)
+        u8g2.print("0");
+      u8g2.print(days);
+      byte x = days % 10;
+      u8g2.setFont(u8g2_font_tiny_simon_tr); //  u8g2_font_profont10_mr
+      u8g2.setCursor(19, 25);
+      if (days == 11 || days == 12 || days == 13)
+        u8g2.print("th");
+      else if (x == 1)
+        u8g2.print("st");
+      else if (x == 2)
+        u8g2.print("nd");
+      else if (x == 3)
+        u8g2.print("rd");
+      else
+        u8g2.print("th");
+
+      u8g2.setFont(u8g2_font_samim_12_t_all);
+      u8g2.setCursor(29, 29);
+      u8g2.print(monthChar[months - 1]);
+      u8g2.setCursor(52, 29);
+      u8g2.print(years);
+      u8g2.setCursor(100, 29);
+      u8g2.print(week[timeinfo.tm_wday]);
+
+      u8g2.drawLine(0, 31, 127, 31);
+
+      if (days == 14 && months == 11) // set these to ZERO to disable birthday message
+      {                               // special message on birthday
+        u8g2.setFont(u8g2_font_6x13_tr);
+        u8g2.setCursor(5, 43);
+        u8g2.print("HAPPY BIRTHDAY MINI!");
+
+        u8g2.setFont(u8g2_font_logisoso16_tr);
+        u8g2.setCursor(25, 63);
+        if (hours < 10)
           u8g2.print("0");
-        u8g2.print(days);
-        byte x = days % 10;
-        u8g2.setFont(u8g2_font_tiny_simon_tr); //  u8g2_font_profont10_mr
-        u8g2.setCursor(18, 25);
-        if (days == 11 || days == 12 || days == 13)
-          u8g2.print("th");
-        else if (x == 1)
-          u8g2.print("st");
-        else if (x == 2)
-          u8g2.print("nd");
-        else if (x == 3)
-          u8g2.print("rd");
-        else
-          u8g2.print("th");
+        u8g2.print(hours);
 
-        u8g2.setFont(u8g2_font_samim_12_t_all);
-        u8g2.setCursor(29, 29);
-        u8g2.print(monthChar[months - 1]);
-        u8g2.setCursor(52, 29);
-        u8g2.print(years);
-        u8g2.setCursor(100, 29);
-        u8g2.print(week[weekday() - 1]);
+        u8g2.print(pulse ? ":" : "");
 
-        u8g2.drawLine(0, 31, 127, 31);
+        u8g2.setCursor(51, 63);
+        if (minutes < 10)
+          u8g2.print("0");
+        u8g2.print(minutes);
 
-        if (days == 14 && months == 11) // set these to ZERO to disable birthday message
-        {                               // special message on birthday
-          u8g2.setFont(u8g2_font_6x13_tr);
-          u8g2.setCursor(5, 43);
-          u8g2.print("HAPPY BIRTHDAY MINI!");
+        u8g2.print(pulse ? ":" : "");
 
-          u8g2.setFont(u8g2_font_logisoso16_tr);
-          u8g2.setCursor(15, 63);
-          if (hours < 10)
-            u8g2.print("0");
-          u8g2.print(hours);
-          if (pulse == 0)
-            u8g2.print(":");
-          else
-            u8g2.print("");
+        u8g2.setCursor(77, 63);
+        if (seconds < 10)
+          u8g2.print("0");
+        u8g2.print(seconds);
 
-          u8g2.setCursor(41, 63);
-          if (minutes < 10)
-            u8g2.print("0");
-          u8g2.print(minutes);
-
-          if (pulse == 0)
-            u8g2.print(":");
-          else
-            u8g2.print("");
-
-          u8g2.setCursor(67, 63);
-          if (seconds < 10)
-            u8g2.print("0");
-          u8g2.print(seconds);
-
-          u8g2.setCursor(95, 63);
-          u8g2.print(isAM() ? "AM" : "PM");
+        if (hour12Mode)
+        {
+          u8g2.setCursor(105, 63);
+          u8g2.print(ampmStr);
 
           u8g2.setFont(u8g2_font_waffle_t_all);
-
           if ((hourlyAlarm || halfHourlyAlarm) && !(muteDark && isDark)) // only show if not muted in dark
             u8g2.drawUTF8(5, 54, "\ue271");                              // symbol for hourly/half-hourly alarm
 
@@ -844,47 +890,64 @@ void loop(void)
         }
         else
         {
-          u8g2.setFont(u8g2_font_logisoso30_tn);
-          u8g2.setCursor(15, 63);
-          if (hours < 10)
-            u8g2.print("0");
-          u8g2.print(hours);
-          if (pulse == 0)
-            u8g2.print(":");
-          else
-            u8g2.print("");
+          u8g2.setFont(u8g2_font_waffle_t_all);
+          if ((hourlyAlarm || halfHourlyAlarm) && !(muteDark && isDark))
+            u8g2.drawUTF8(105, 54, "\ue271");
 
-          u8g2.setCursor(63, 63);
-          if (minutes < 10)
-            u8g2.print("0");
-          u8g2.print(minutes);
+          if (WiFi.status() == WL_CONNECTED)
+            u8g2.drawUTF8(105, 64, "\ue2b5");
+        }
+      }
+      else
+      {
+        u8g2.setFont(u8g2_font_logisoso30_tn);
+        u8g2.setCursor(15, 63);
+        if (hours < 10)
+          u8g2.print("0");
+        u8g2.print(hours);
+        u8g2.print(pulse ? ":" : "");
 
-          u8g2.setFont(u8g2_font_tenthinnerguys_tu);
-          u8g2.setCursor(105, 42);
-          if (seconds < 10)
-            u8g2.print("0");
-          u8g2.print(seconds);
+        u8g2.setCursor(63, 63);
+        if (minutes < 10)
+          u8g2.print("0");
+        u8g2.print(minutes);
 
+        u8g2.setFont(u8g2_font_tenthinnerguys_tu);
+        u8g2.setCursor(105, 42);
+        if (seconds < 10)
+          u8g2.print("0");
+        u8g2.print(seconds);
+        if (hour12Mode)
+        {
           u8g2.setCursor(105, 63);
-          u8g2.print(isAM() ? "AM" : "PM");
+          u8g2.print(ampmStr);
 
           u8g2.setFont(u8g2_font_waffle_t_all);
-
           if ((hourlyAlarm || halfHourlyAlarm) && !(muteDark && isDark)) // only show if not muted in dark
             u8g2.drawUTF8(103, 52, "\ue271");                            // symbol for hourly/half-hourly alarm
 
           if (WiFi.status() == WL_CONNECTED)
             u8g2.drawUTF8(112, 52, "\ue2b5"); // wifi-active symbol
         }
-        u8g2.sendBuffer();
-        pulse = !pulse;
+        else
+        {
+          u8g2.setFont(u8g2_font_waffle_t_all);
+          if ((hourlyAlarm || halfHourlyAlarm) && !(muteDark && isDark))
+            u8g2.drawUTF8(103, 63, "\ue271");
+
+          if (WiFi.status() == WL_CONNECTED)
+            u8g2.drawUTF8(112, 63, "\ue2b5");
+        }
       }
+      u8g2.sendBuffer();
+      pulse = !pulse;
     }
 
     // check if the touchValue is below the threshold
     // if it is, set ledPin to HIGH
     if (analogRead(NEXT_BUTTON) > 1000)
     {
+      Serial.println("[DEBUG] loop: NEXT_BUTTON pressed, entering menu");
       menu();
     }
   }
@@ -901,7 +964,7 @@ void menu()
   u8g2.setCursor(5, 43);
   u8g2.print("SETTINGS");
   u8g2.sendBuffer();
-  delay(500);
+  delay(300);
   byte count = 0;
   while (true)
   {
@@ -919,10 +982,12 @@ void menu()
     u8g2.setCursor(5, 52);
     u8g2.print("GPS DATA");
     u8g2.setCursor(5, 62);
+    u8g2.print("MODE");
+    u8g2.setCursor(80, 22);
     u8g2.print("ABOUT");
-    u8g2.setCursor(80, 52);
+    u8g2.setCursor(80, 32);
     u8g2.print("RESET");
-    u8g2.setCursor(80, 62);
+    u8g2.setCursor(80, 42);
     u8g2.print("EXIT");
 
     u8g2.setFont(u8g2_font_waffle_t_all);
@@ -935,17 +1000,19 @@ void menu()
     else if (count == 3)
       u8g2.drawUTF8(54, 52, "\ue14e");
     else if (count == 4)
-      u8g2.drawUTF8(36, 62, "\ue14e");
+      u8g2.drawUTF8(30, 62, "\ue14e");
     else if (count == 5)
-      u8g2.drawUTF8(111, 52, "\ue14e");
+      u8g2.drawUTF8(111, 22, "\ue14e");
     else if (count == 6)
-      u8g2.drawUTF8(104, 62, "\ue14e");
+      u8g2.drawUTF8(111, 32, "\ue14e");
+    else if (count == 7)
+      u8g2.drawUTF8(104, 42, "\ue14e");
 
     if (analogRead(NEXT_BUTTON) > 1000)
     {
       delay(100);
       count++;
-      if (count > 6)
+      if (count > 7)
         count = 0;
     }
 
@@ -956,34 +1023,39 @@ void menu()
       if (count == 0)
       {
         adjustBrightness();
-        count = 6;
+        count = 7;
       }
       else if (count == 1)
       {
         editAlarms();
-        count = 6;
+        count = 7;
       }
       else if (count == 2)
       {
         wifiConfig();
-        count = 6;
+        count = 7;
       }
       else if (count == 3)
       {
         aboutGPS();
-        count = 6;
+        count = 7;
       }
       else if (count == 4)
       {
-        displayInfo();
-        count = 6;
+        changeMode();
+        count = 7;
       }
       else if (count == 5)
       {
-        resetAll();
-        count = 6;
+        displayInfo();
+        count = 7;
       }
       else if (count == 6)
+      {
+        resetAll();
+        count = 7;
+      }
+      else if (count == 7)
         return;
     }
   }
@@ -1373,6 +1445,7 @@ void editAlarms()
 
             if (count == 2)
             {
+              pref.begin("database", false);
               pref.putInt("buzzVol", buzzVol); // SAVE THE VALUE
               buzzVol = pref.getInt("buzzVol", 255);
               pref.end();
@@ -1393,6 +1466,71 @@ void editAlarms()
   }
 }
 
+/**
+ * @brief Change display mode settings
+ */
+void changeMode()
+{
+  delay(100);
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_logisoso20_tr);
+  u8g2.setCursor(5, 43);
+  u8g2.print("MODE");
+  u8g2.sendBuffer();
+  delay(300);
+  byte count = 0;
+  while (true)
+  {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_t0_11_mf);
+    u8g2.setCursor(5, 10);
+    u8g2.print("SETTINGS: MODE");
+    u8g2.drawLine(0, 11, 127, 11);
+    u8g2.setCursor(5, 22);
+    u8g2.print("12-HOUR");
+    u8g2.setCursor(5, 32);
+    u8g2.print("EXIT");
+    u8g2.setFont(u8g2_font_waffle_t_all);
+    if (count == 0)
+      u8g2.drawUTF8(52, 22, "\ue14e");
+    else if (count == 1)
+      u8g2.drawUTF8(30, 32, "\ue14e");
+    if (analogRead(NEXT_BUTTON) > 1000)
+    {
+      delay(100);
+      count++;
+      if (count > 1)
+        count = 0;
+    }
+    u8g2.sendBuffer();
+    if (analogRead(SELECT_BUTTON) > 1000)
+    {
+      delay(100);
+      if (count == 0)
+      {
+        delay(100);
+        u8g2.clearBuffer();
+        u8g2.setFont(u8g2_font_logisoso20_tr);
+        u8g2.setCursor(0, 43);
+        u8g2.print("12-HOUR");
+        u8g2.sendBuffer();
+        delay(300);
+        if (hour12Mode == true)
+          count = 0;
+        else
+          count = 1;
+
+        editBoolSetting("SETTINGS: 12-HOUR", "hour12Mode", hour12Mode);
+        count = 1;
+      }
+      else if (count == 1)
+      {
+        delay(100);
+        return;
+      }
+    }
+  }
+}
 /**
  * @brief Configure WiFi settings
  */
@@ -1474,11 +1612,11 @@ void displayInfo()
     u8g2.print(SWVersion);
     u8g2.setCursor(1, 11);
     u8g2.print("Dev.: ");
-    u8g2.print("A. Patra");
+    u8g2.print("desiFish");
     u8g2.setCursor(1, 19);
     u8g2.print("This is a special version of");
     u8g2.setCursor(1, 25);
-    u8g2.print("my existing code ESP32-GPS-Clock");
+    u8g2.print("my existing code GPS-Clock-V1");
     u8g2.setCursor(1, 31);
     u8g2.print("which was for my sister Nini.");
     u8g2.setCursor(1, 37);
@@ -1558,15 +1696,15 @@ void resetAll()
   if (temp)
   {
     pref.putInt("lcd_bright", 250);
-    pref.putBool("autoBright", false);
-    pref.putBool("hourlyAlarm", false);
-    pref.putBool("halfHourlyAlarm", false);
+    pref.putBool("autoBright", true);
+    pref.putBool("hourlyAlarm", true);
+    pref.putBool("halfHourlyAlarm", true);
     pref.putBool("useWifi", false);
-    pref.putBool("muteDark", false);
-    pref.putBool("offInDark", false);
+    pref.putBool("muteDark", true);
+    pref.putBool("offInDark", true);
     pref.putString("ssid", "");
     pref.putString("password", "");
-    pref.putInt("buzzVol", 50);
+    pref.putInt("buzzVol", 250);
     pref.end();
 
     byte i = 5;
@@ -1660,6 +1798,7 @@ void gpsInfo(String msg)
  */
 void buzzer(int Delay, byte count)
 {
+  Serial.println("[DEBUG] buzzer: Beeping " + String(count) + " times with volume " + String(buzzVol));
   for (int i = 0; i < count; i++)
   {
     analogWrite(BUZZER_PIN, buzzVol);
@@ -1681,7 +1820,7 @@ void wifiManagerInfoPrint()
   u8g2.setCursor(1, 22);
   u8g2.print("on your phone/laptop.");
   u8g2.setCursor(1, 34);
-  u8g2.print("Connect to->");
+  u8g2.print("Connect to:");
   u8g2.setCursor(1, 46);
   u8g2.print("SSID: WIFI_MANAGER");
   u8g2.setCursor(1, 58);
@@ -1702,7 +1841,7 @@ void WiFiEvent(WiFiEvent_t event)
     u8g2.setCursor(1, 10);
     u8g2.print("On browser, go to");
     u8g2.setCursor(1, 22);
-    u8g2.print("192.168.4.1/wifi");
+    u8g2.print("192.168.4.1");
     u8g2.setCursor(1, 34);
     u8g2.print("Enter your Wifi");
     u8g2.setCursor(1, 46);
