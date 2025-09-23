@@ -485,6 +485,13 @@ void setup(void)
   {
     errorMsgPrint("BME280", "CANNOT FIND");
   }
+  // Set up oversampling and filter initialization
+  bme.setSampling(Adafruit_BME280::MODE_NORMAL,
+                  Adafruit_BME280::SAMPLING_X16,     // temperature
+                  Adafruit_BME280::SAMPLING_X16,     // pressure
+                  Adafruit_BME280::SAMPLING_X16,     // humidity
+                  Adafruit_BME280::FILTER_X16,       // filter
+                  Adafruit_BME280::STANDBY_MS_1000); // set delay between measurements
   // wifi manager
   if (useWifi)
   {
