@@ -44,7 +44,8 @@
 // I2C related
 #include <Wire.h>
 #include <BH1750.h> //Light Sensor BH1750
-#include <AHTxx.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 
 // GPS and Timing
 #include <TinyGPSPlus.h>
@@ -71,14 +72,13 @@
  */
 U8G2_ST7920_128X64_F_SW_SPI u8g2(U8G2_R0, /* clock=*/18, /* data=*/23, /* cs=*/U8X8_PIN_NONE, /* reset=*/U8X8_PIN_NONE);
 
+Adafruit_BME280 bme;
 // Preference library object or instance
 Preferences pref;
 // Light Sensor Object
 BH1750 lightMeter;
 
 float ahtValue; // to store Temp result
-
-AHTxx aht20(AHTXX_ADDRESS_X38, AHT2x_SENSOR); // sensor address, sensor type
 
 // Time related
 time_t currentEpoch;
@@ -129,8 +129,8 @@ unsigned long lastTime2 = 0;
 const long timerDelay2 = 12000; // temperature sensor update delay
 
 bool isDark; // Tracks ambient light state
-float ahtTemp = 0.0;
-int ahtHum = 0;
+float temperature = 0.0;
+int humidity = 0, pressure = 0;
 
 // features config, saved in preference library
 int LCD_BRIGHTNESS, buzzVol;
@@ -242,10 +242,53 @@ byte currentBrightness = 250; // Track current brightness level
  * @param prefKey The Preferences key to store the value
  * @param var Reference to the variable to update
  */
+
+// For settings: updates variable and preference
 void editBoolSetting(const char *displayText, const char *prefKey, bool &var)
 {
-  pref.begin("database", false);
-  int count = var ? 0 : 1;
+  bool count = var;
+  while (true)
+  {
+    delay(100);
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_t0_11_mf);
+    u8g2.setCursor(5, 10);
+    u8g2.print(displayText);
+    u8g2.drawLine(0, 11, 127, 11);
+    pref.begin("database", false);
+    u8g2.setCursor(5, 22);
+    u8g2.print("ON");
+    u8g2.setCursor(5, 32);
+    u8g2.print("OFF");
+
+    u8g2.setFont(u8g2_font_waffle_t_all);
+    if (count)
+      u8g2.drawUTF8(24, 22, "\ue14e");
+    else if (!count)
+      u8g2.drawUTF8(24, 32, "\ue14e");
+
+    u8g2.sendBuffer();
+    if (analogRead(NEXT_BUTTON) > 1000)
+    {
+      delay(100);
+      count = !count;
+    }
+
+    if (analogRead(SELECT_BUTTON) > 1000)
+    {
+      delay(100);
+      pref.putBool(prefKey, count);
+      var = pref.getBool(prefKey, false);
+      pref.end();
+      break;
+    }
+  }
+}
+
+// For confirmation dialogs: no reference, no preference
+bool editBoolSetting(const char *displayText)
+{
+  bool count = false;
   while (true)
   {
     delay(100);
@@ -255,34 +298,30 @@ void editBoolSetting(const char *displayText, const char *prefKey, bool &var)
     u8g2.print(displayText);
     u8g2.drawLine(0, 11, 127, 11);
     u8g2.setCursor(5, 22);
-    u8g2.print("ON");
+    u8g2.print("YES");
     u8g2.setCursor(5, 32);
-    u8g2.print("OFF");
+    u8g2.print("NO");
 
     u8g2.setFont(u8g2_font_waffle_t_all);
-    if (count == 0)
+    if (!count)
       u8g2.drawUTF8(24, 22, "\ue14e");
-    else if (count == 1)
+    else if (count)
       u8g2.drawUTF8(24, 32, "\ue14e");
 
     u8g2.sendBuffer();
     if (analogRead(NEXT_BUTTON) > 1000)
     {
       delay(100);
-      count++;
-      if (count > 1)
-        count = 0;
+      count = !count;
     }
 
     if (analogRead(SELECT_BUTTON) > 1000)
     {
       delay(100);
-      pref.putBool(prefKey, count == 0);
-      var = pref.getBool(prefKey, false);
-      pref.end();
       break;
     }
   }
+  return !count;
 }
 
 // --- Serve static files from LittleFS (SPIFFS) and provide async API for WiFi credentials ---
@@ -364,29 +403,6 @@ void setup(void)
   Wire.begin();
   Serial1.begin(9600, SERIAL_8N1, RXPin, TXPin); // for GPS running on Hardware Serial
 
-  // --- LittleFS Init ---
-  if (!LittleFS.begin())
-  {
-    Serial.println("[ERROR] LittleFS Mount Failed");
-    Serial.println("Formatting LittleFS...");
-    if (LittleFS.format())
-    {
-      Serial.println("LittleFS formatted successfully");
-      if (!LittleFS.begin())
-      {
-        Serial.println("[ERROR] LittleFS Mount Failed even after formatting");
-      }
-    }
-    else
-    {
-      Serial.println("[ERROR] LittleFS Format Failed");
-    }
-  }
-  else
-  {
-    Serial.println("LittleFS mounted successfully!");
-  }
-
   pinMode(LCD_LIGHT, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
 
@@ -465,9 +481,9 @@ void setup(void)
   if (!lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
     errorMsgPrint("BH1750", "CANNOT FIND");
 
-  if (aht20.begin() != true)
+  if (!bme.begin(BME280_ADDRESS_ALTERNATE))
   {
-    errorMsgPrint("AHT25", "CANNOT FIND");
+    errorMsgPrint("BME280", "CANNOT FIND");
   }
   // wifi manager
   if (useWifi)
@@ -481,7 +497,29 @@ void setup(void)
     password = pref.getString("password", "");
 
     if (ssid == "" || password == "")
-    {
+    { // --- LittleFS Init ---
+      if (!LittleFS.begin())
+      {
+        Serial.println("[ERROR] LittleFS Mount Failed");
+        Serial.println("Formatting LittleFS...");
+        if (LittleFS.format())
+        {
+          Serial.println("LittleFS formatted successfully");
+          if (!LittleFS.begin())
+          {
+            Serial.println("[ERROR] LittleFS Mount Failed even after formatting");
+          }
+        }
+        else
+        {
+          Serial.println("[ERROR] LittleFS Format Failed");
+        }
+      }
+      else
+      {
+        Serial.println("LittleFS mounted successfully!");
+      }
+      delay(100);
       Serial.println("No values saved for ssid or password");
       Serial.println("Setting AP (Access Point)");
       WiFi.mode(WIFI_AP);
@@ -498,6 +536,14 @@ void setup(void)
       while (true)
       {
         delay(50);
+        if (analogRead(SELECT_BUTTON) > 1000)
+        {
+          errorMsgPrint("WIFI", "CANCELLED");
+          delay(100);
+          server.end();
+          WiFi.softAPdisconnect(true);
+          break; // exit loop to continue normal flow
+        }
       }
     }
     else
@@ -549,7 +595,6 @@ void setup(void)
         ElegantOTA.onStart(onOTAStart);
         ElegantOTA.onProgress(onOTAProgress);
         ElegantOTA.onEnd(onOTAEnd);
-
         // Start server last after all routes are set
         server.begin();
         delay(4000);
@@ -568,8 +613,9 @@ void setup(void)
   u8g2.sendBuffer();
   delay(1500);
   pref.end();
-  ahtTemp = aht20.readTemperature(); // NEED TO CHANGE THE SENSOR, it shows +3 degrees extra
-  ahtHum = aht20.readHumidity();
+  temperature = bme.readTemperature();
+  humidity = bme.readHumidity();
+  pressure = bme.readPressure() / 100.0F;
   xTaskCreatePinnedToCore(
       loop1,                              /* Task function. */
       "loop1Task",                        /* name of task. */
@@ -663,12 +709,15 @@ void loop1(void *pvParameters)
       if (!(isDark && offInDark)) // Only read sensor if not in dark mode with offInDark enabled
       {
         Serial.println("[DEBUG] loop1: Reading temperature/humidity sensor...");
-        ahtTemp = aht20.readTemperature();
-        ahtHum = aht20.readHumidity();
+        temperature = bme.readTemperature();
+        humidity = bme.readHumidity();
+        pressure = bme.readPressure() / 100.0F;
         Serial.print("[DEBUG] loop1: Temp=");
-        Serial.print(ahtTemp);
+        Serial.print(temperature);
         Serial.print(", Hum=");
-        Serial.println(ahtHum);
+        Serial.print(humidity);
+        Serial.print(", Pressure=");
+        Serial.println(pressure);
       }
       lastTime2 = millis();
     }
@@ -802,22 +851,22 @@ void loop(void)
       u8g2.clearBuffer();
       u8g2.setFont(u8g2_font_t0_11_tf);
       u8g2.setCursor(2, 13);
-      u8g2.print(String(ahtTemp, 1)); // Show temperature with 1 decimal place
+      u8g2.print(String(temperature, 1)); // Show temperature with 1 decimal place
       u8g2.setFont(u8g2_font_threepix_tr);
       u8g2.setCursor(28, 8);
       u8g2.print("o");
       u8g2.setFont(u8g2_font_t0_11_tf);
       u8g2.setCursor(32, 13);
       u8g2.print("C ");
-      String temp = String(1008) + "hPa";               // Ensure font is set
-      int stringWidth = u8g2.getStrWidth(temp.c_str()); // Get exact pixel width
-      u8g2.setCursor((128 - stringWidth) / 2, 13);      // Center using screen width
-      u8g2.print(temp);
-      if (ahtHum > 99)
+      String var = String(int(pressure)) + "hPa";        // Ensure font is set
+      int stringWidth = u8g2.getStrWidth(var.c_str());   // Get exact pixel width
+      u8g2.setCursor(((128 - stringWidth) / 2) + 3, 13); // Center using screen width
+      u8g2.print(var);
+      if (humidity > 99)
         u8g2.setCursor(90, 13);
       else
         u8g2.setCursor(96, 13);
-      u8g2.print(ahtHum);
+      u8g2.print(humidity);
       u8g2.print("%rH");
 
       u8g2.drawLine(0, 17, 127, 17);
@@ -1652,75 +1701,97 @@ void resetAll()
   u8g2.setCursor(0, 43);
   u8g2.print("RESET");
   u8g2.sendBuffer();
-  delay(500);
-  bool temp;
-  byte count = 1;
+  delay(300);
+  bool count = false;
   while (true)
   {
     delay(100);
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
     u8g2.setCursor(5, 10);
-    u8g2.print("SETTINGS: RESET ALL");
+    u8g2.print("SETTINGS: RESET");
     u8g2.drawLine(0, 11, 127, 11);
     u8g2.setCursor(5, 22);
-    u8g2.print("YES");
+    u8g2.print("RESET ALL");
     u8g2.setCursor(5, 32);
-    u8g2.print("NO");
+    u8g2.print("RESET WIFI");
 
     u8g2.setFont(u8g2_font_waffle_t_all);
-    if (count == 0)
-      u8g2.drawUTF8(24, 22, "\ue14e");
-    else if (count == 1)
-      u8g2.drawUTF8(24, 32, "\ue14e");
+    if (!count)
+      u8g2.drawUTF8(60, 22, "\ue14e");
+    else if (count)
+      u8g2.drawUTF8(68, 32, "\ue14e");
 
     u8g2.sendBuffer();
     if (analogRead(NEXT_BUTTON) > 1000)
     {
       delay(100);
-      count++;
-      if (count > 1)
-        count = 0;
+      count = !count;
     }
 
     if (analogRead(SELECT_BUTTON) > 1000)
     {
       delay(100);
-      if (count == 0)
-        temp = true;
-      else if (count == 1)
-        temp = false;
       break;
     }
   }
-  if (temp)
+  if (!count)
   {
-    pref.putInt("lcd_bright", 250);
-    pref.putBool("autoBright", true);
-    pref.putBool("hourlyAlarm", true);
-    pref.putBool("halfHourlyAlarm", true);
-    pref.putBool("useWifi", false);
-    pref.putBool("muteDark", true);
-    pref.putBool("offInDark", true);
-    pref.putString("ssid", "");
-    pref.putString("password", "");
-    pref.putInt("buzzVol", 250);
-    pref.end();
-
-    byte i = 5;
-    while (i > 0)
+    count = editBoolSetting("RESET: ALL");
+    if (count)
     {
-      u8g2.clearBuffer();
-      u8g2.setFont(u8g2_font_luRS08_tr);
-      u8g2.setCursor(5, 21);
-      u8g2.print("DEVICE WILL RESTART");
-      u8g2.setCursor(60, 51);
-      u8g2.print(i);
-      u8g2.sendBuffer();
-      delay(1000);
-      i--;
+      pref.putInt("lcd_bright", 250);
+      pref.putBool("autoBright", true);
+      pref.putBool("hourlyAlarm", true);
+      pref.putBool("halfHourlyAlarm", true);
+      pref.putBool("useWifi", false);
+      pref.putBool("muteDark", true);
+      pref.putBool("offInDark", true);
+      pref.putString("ssid", "");
+      pref.putString("password", "");
+      pref.putInt("buzzVol", 250);
+      pref.end();
+
+      byte i = 5;
+      while (i > 0)
+      {
+        u8g2.clearBuffer();
+        u8g2.setFont(u8g2_font_luRS08_tr);
+        u8g2.setCursor(5, 21);
+        u8g2.print("DEVICE WILL RESTART");
+        u8g2.setCursor(60, 51);
+        u8g2.print(i);
+        u8g2.sendBuffer();
+        delay(1000);
+        i--;
+      }
+      ESP.restart();
     }
-    ESP.restart();
+  }
+  else if (count)
+  {
+    count = editBoolSetting("RESET: WIFI");
+    if (count)
+    {
+      pref.putString("ssid", "");
+      pref.putString("password", "");
+      pref.end();
+
+      byte i = 5;
+      while (i > 0)
+      {
+        u8g2.clearBuffer();
+        u8g2.setFont(u8g2_font_luRS08_tr);
+        u8g2.setCursor(5, 21);
+        u8g2.print("DEVICE WILL RESTART");
+        u8g2.setCursor(60, 51);
+        u8g2.print(i);
+        u8g2.sendBuffer();
+        delay(1000);
+        i--;
+      }
+      ESP.restart();
+    }
   }
 }
 
@@ -1841,7 +1912,7 @@ void WiFiEvent(WiFiEvent_t event)
     u8g2.setCursor(1, 10);
     u8g2.print("On browser, go to");
     u8g2.setCursor(1, 22);
-    u8g2.print("192.168.4.1");
+    u8g2.print("http://192.168.4.1");
     u8g2.setCursor(1, 34);
     u8g2.print("Enter your Wifi");
     u8g2.setCursor(1, 46);
