@@ -71,14 +71,12 @@
  * No CS or Reset pins used (U8X8_PIN_NONE)
  */
 U8G2_ST7920_128X64_F_SW_SPI u8g2(U8G2_R0, /* clock=*/18, /* data=*/23, /* cs=*/U8X8_PIN_NONE, /* reset=*/U8X8_PIN_NONE);
-
+// BME280 Object
 Adafruit_BME280 bme;
 // Preference library object or instance
 Preferences pref;
 // Light Sensor Object
 BH1750 lightMeter;
-
-float ahtValue; // to store Temp result
 
 // Time related
 time_t currentEpoch;
@@ -92,17 +90,12 @@ struct tm timeinfo;
  */
 static const int RXPin = 16, TXPin = 17;
 
-/**
- * Control Pins
- * LCD_LIGHT = 4: LCD backlight control (PWM)
- * BUZZER_PIN = 33: Active buzzer control
- * NEXT_BUTTON = 36: Menu navigation (ADC input)
- * SELECT_BUTTON = 39: Menu selection (ADC input)
- */
-#define LCD_LIGHT 4
-#define BUZZER_PIN 33
-#define NEXT_BUTTON 36
-#define SELECT_BUTTON 39
+// HW Control Pins
+
+#define LCD_LIGHT 4      // LCD backlight control (PWM)
+#define BUZZER_PIN 33    // Active buzzer control
+#define NEXT_BUTTON 36   // Menu navigation (ADC input)
+#define SELECT_BUTTON 39 // Menu selection (ADC input)
 
 // GPS instance
 TinyGPSPlus gps;
@@ -634,6 +627,8 @@ void setup(void)
   u8g2.sendBuffer();
   delay(1500);
   pref.end();
+  if (!autoBright) // set initial brightness, in manual mode
+    ledcWrite(LCD_LIGHT, LCD_BRIGHTNESS);
   xTaskCreatePinnedToCore(
       loop1,       /* Task function. */
       "loop1Task", /* name of task. */
@@ -642,10 +637,6 @@ void setup(void)
       1,           /* priority of the task */
       &loop1Task,  /* Task handle to keep track of created task */
       0);          /* pin task to core 0 */
-  // set initial brightness
-  if (!autoBright)
-    ledcWrite(LCD_LIGHT, LCD_BRIGHTNESS);
-  delay(100);
 }
 
 float lux = 0;
@@ -718,7 +709,7 @@ void loop1(void *pvParameters)
         else
         {
           // exponential moving average (EMA)
-          float alpha = 0.7; // smoother
+          float alpha = 0.7; // smoother 0.7-0.9
           float tempBrightness = currentBrightness;
           tempBrightness = tempBrightness * alpha + targetBrightness * (1.0 - alpha);
           currentBrightness = (byte)tempBrightness;
@@ -1903,11 +1894,12 @@ void gpsInfo(String msg)
   smartDelay(900);
 }
 
-// --- Smooth beep function ---
-// numBeeps: 1 or 2
-// duration_ms: total duration of each beep including fade
-// maxVolume: 0–255 (8-bit PWM)
-
+/**
+ * @brief Generate simple beeps using the buzzer
+ * @param numBeeps Number of beeps to generate
+ * @param duration_ms Duration of each beep in milliseconds
+ * @param maxVolume Maximum volume level (0-255)
+ */
 void simpleBeep(int numBeeps, int duration_ms, byte maxVolume)
 {
   int pauseTime = 150; // pause between double beeps
