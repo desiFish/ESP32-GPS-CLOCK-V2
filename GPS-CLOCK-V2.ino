@@ -24,7 +24,7 @@
  * Software version number
  * Format: major.minor.patch
  */
-#define SWVersion "2.0.0"
+#define SWVersion "2.1.0"
 
 //========== Library Includes ==========//
 /**
@@ -121,10 +121,13 @@ byte days = 0, months = 0, hours = 0, minutes = 0, seconds = 0;
 int years = 0;
 
 // LUX (BH1750) update frequency
-unsigned long lastTime1 = 0;
-int timerDelay1 = 2000; // Light Sensor update delay
+unsigned long lastLightRead = 0;
+unsigned long lastBrightnessUpdate = 0;
 
-// AHT25 update frequency
+const unsigned long lightInterval = 4000;    // lux sampling
+const unsigned long brightnessInterval = 50; // animation
+
+// BME280 update frequency
 unsigned long lastTime2 = 0;
 const long timerDelay2 = 12000; // temperature sensor update delay
 
@@ -139,6 +142,14 @@ bool autoBright, hourlyAlarm, halfHourlyAlarm, useWifi, muteDark, offInDark, hou
 // your wifi name and password (saved in preference library)
 String ssid;
 String password;
+
+const int pwmChannel = 0;    // PWM channel 0–15
+const int pwmFreq = 5000;    // PWM frequency in Hz
+const int pwmResolution = 8; // 8-bit resolution (0–255)
+
+const int BUZZER_CHANNEL = 1;
+const int PWM_FREQ = 2700; // default tone frequency
+const int PWM_RES = 8;     // 8-bit resolution
 
 // for various server related stuff
 AsyncWebServer server(80);
@@ -406,7 +417,11 @@ void setup(void)
   pinMode(LCD_LIGHT, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  analogWrite(LCD_LIGHT, 150);
+  // Attach buzzer to PWM channel
+  ledcAttachChannel(BUZZER_PIN, PWM_FREQ, PWM_RES, BUZZER_CHANNEL);
+  // Setup ESP32 PWM for backlight
+  ledcAttachChannel(LCD_LIGHT, pwmFreq, pwmResolution, pwmChannel);
+  ledcWrite(LCD_LIGHT, 150);
 
   u8g2.begin();
   u8g2.clearBuffer();
@@ -462,9 +477,8 @@ void setup(void)
     pref.putInt("buzzVol", 255);
   }
   buzzVol = pref.getInt("buzzVol", 255);
-  analogWrite(BUZZER_PIN, buzzVol);
-  delay(20);
-  analogWrite(BUZZER_PIN, 0);
+
+  simpleBeep(1, 100, 255);
 
   if (!pref.isKey("offInDark"))
   {
@@ -486,7 +500,7 @@ void setup(void)
     errorMsgPrint("BME280", "CANNOT FIND");
   }
   // Set up oversampling and filter initialization
-  bme.setSampling(Adafruit_BME280::MODE_NORMAL,
+  bme.setSampling(Adafruit_BME280::MODE_FORCED,      // use forced mode for power saving
                   Adafruit_BME280::SAMPLING_X16,     // temperature
                   Adafruit_BME280::SAMPLING_X16,     // pressure
                   Adafruit_BME280::SAMPLING_X16,     // humidity
@@ -620,21 +634,22 @@ void setup(void)
   u8g2.sendBuffer();
   delay(1500);
   pref.end();
-  temperature = bme.readTemperature();
-  humidity = bme.readHumidity();
-  pressure = bme.readPressure() / 100.0F;
   xTaskCreatePinnedToCore(
-      loop1,                              /* Task function. */
-      "loop1Task",                        /* name of task. */
-      10000,                              /* Stack size of task */
-      NULL,                               /* parameter of the task */
-      1,                                  /* priority of the task */
-      &loop1Task,                         /* Task handle to keep track of created task */
-      0);                                 /* pin task to core 0 */
-  analogWrite(LCD_LIGHT, LCD_BRIGHTNESS); // set brightness
+      loop1,       /* Task function. */
+      "loop1Task", /* name of task. */
+      10000,       /* Stack size of task */
+      NULL,        /* parameter of the task */
+      1,           /* priority of the task */
+      &loop1Task,  /* Task handle to keep track of created task */
+      0);          /* pin task to core 0 */
+  // set initial brightness
+  if (!autoBright)
+    ledcWrite(LCD_LIGHT, LCD_BRIGHTNESS);
   delay(100);
 }
 
+float lux = 0;
+byte targetBrightness = 0;
 /**
  * @brief Secondary loop running on Core 0
  *
@@ -652,63 +667,71 @@ void loop1(void *pvParameters)
   Serial.println("[DEBUG] loop1: Started on Core 0");
   for (;;)
   {
-    if ((millis() - lastTime1) > timerDelay1)
+    if (millis() - lastLightRead > lightInterval)
     {
-      timerDelay1 = 4000;
-      Serial.println("[DEBUG] loop1: Reading light sensor...");
+      lastLightRead = millis();
+
       lightMeter.configure(BH1750::ONE_TIME_HIGH_RES_MODE);
-      float lux;
+
+      // Block until measurement ready (with timeout for safety)
+      unsigned long start = millis();
       while (!lightMeter.measurementReady(true))
       {
+        if (millis() - start > 3000)
+        { // 3s timeout
+          Serial.println("[ERROR] Light sensor timeout!");
+          break;
+        }
         yield();
       }
+
+      // Read lux (may be stale if timeout triggered)
       lux = lightMeter.readLightLevel();
 
-      Serial.print("[DEBUG] loop1: LUXRaw = ");
-      Serial.println(lux);
+      // Map lux to target brightness
+      byte val1 = constrain(lux, 1, 120);
+      targetBrightness = map(val1, 1, 120, 10, 255);
 
-      isDark = lux <= 1; // Consider it dark if LUX is 1 or below
+      Serial.print("[DEBUG] Lux = ");
+      Serial.print(lux);
+      Serial.print(", targetBrightness = ");
+      Serial.print(targetBrightness);
+      Serial.print(", isDark = ");
+      Serial.println(isDark);
+    }
+
+    // --- Brightness animation every 200ms ---
+    if (millis() - lastBrightnessUpdate > brightnessInterval)
+    {
+      lastBrightnessUpdate = millis();
 
       if (autoBright)
       {
-        Serial.print("[DEBUG] loop1: autoBright enabled, isDark=");
-        Serial.print(isDark);
-        Serial.print(", offInDark=");
-        Serial.println(offInDark);
+        byte previousBrightness = currentBrightness; // store old value
+        // Update darkness flag
+        isDark = lux <= 1;
+
         if (isDark && offInDark)
         {
-          currentBrightness = 0; // Set to minimum brightness in dark if offInDark is enabled
+          currentBrightness = 0; // force off
         }
         else
         {
-          byte targetBrightness;
-          byte val1 = constrain(lux, 1, 120);
-          targetBrightness = map(val1, 1, 120, 10, 255);
-          if (currentBrightness != targetBrightness)
-          {
-            timerDelay1 = 200; // Faster updates during transition
-            int diff = targetBrightness - currentBrightness;
-            // Calculate step size based on difference
-            // Larger differences = larger steps, smaller differences = smaller steps
-            byte stepSize = max(1, min(abs(diff) / 4, 15));
-            if (diff > 0)
-            {
-              currentBrightness = min(255, currentBrightness + stepSize);
-            }
-            else
-            {
-              currentBrightness = max(5, currentBrightness - stepSize);
-            }
-            Serial.print("[DEBUG] loop1: Adjusting brightness, current=");
-            Serial.print(currentBrightness);
-            Serial.print(", target=");
-            Serial.println(targetBrightness);
-          }
+          // exponential moving average (EMA)
+          float alpha = 0.7; // smoother
+          float tempBrightness = currentBrightness;
+          tempBrightness = tempBrightness * alpha + targetBrightness * (1.0 - alpha);
+          currentBrightness = (byte)tempBrightness;
         }
-        analogWrite(LCD_LIGHT, currentBrightness);
-      }
 
-      lastTime1 = millis();
+        // Only write PWM if it changed
+        if (currentBrightness != previousBrightness)
+        {
+          ledcWrite(LCD_LIGHT, currentBrightness);
+          Serial.print("[DEBUG] Brightness = ");
+          Serial.println(currentBrightness);
+        }
+      }
     }
 
     if ((millis() - lastTime2) > timerDelay2)
@@ -716,6 +739,7 @@ void loop1(void *pvParameters)
       if (!(isDark && offInDark)) // Only read sensor if not in dark mode with offInDark enabled
       {
         Serial.println("[DEBUG] loop1: Reading temperature/humidity sensor...");
+        bme.takeForcedMeasurement();
         temperature = bme.readTemperature();
         humidity = bme.readHumidity();
         pressure = bme.readPressure() / 100.0F;
@@ -729,23 +753,34 @@ void loop1(void *pvParameters)
       lastTime2 = millis();
     }
 
-    if (!(isDark && muteDark) && years > 2024 && seconds == 0 && (hourlyAlarm || halfHourlyAlarm))
+    static bool alarmTriggered = false; // persists across loop iterations
+
+    if (!(isDark && muteDark) && years > 2024)
     {
+      int beeps = 0;
+
       if (minutes == 0 && hourlyAlarm)
-      {
-        Serial.print("[DEBUG] loop1: Hourly alarm triggered at ");
-        Serial.print(hours);
-        Serial.print(":");
-        Serial.println(minutes);
-        buzzer(600, 1);
-      }
+        beeps = 1;
       else if (minutes == 30 && halfHourlyAlarm)
+        beeps = 2;
+
+      if (beeps > 0)
       {
-        Serial.print("[DEBUG] loop1: Half-hourly alarm triggered at ");
-        Serial.print(hours);
-        Serial.print(":");
-        Serial.println(minutes);
-        buzzer(400, 2);
+        if (!alarmTriggered) // only trigger once per minute
+        {
+          Serial.print("[DEBUG] Alarm triggered at ");
+          Serial.print(hours);
+          Serial.print(":");
+          Serial.println(minutes);
+
+          simpleBeep(beeps, 1000, buzzVol);
+          alarmTriggered = true;
+        }
+      }
+      else
+      {
+        // reset flag when not matching alarm minute
+        alarmTriggered = false;
       }
     }
     delay(50);
@@ -1233,8 +1268,7 @@ void adjustBrightness()
               if (count > 2)
                 count = 0;
             }
-
-            analogWrite(LCD_LIGHT, LCD_BRIGHTNESS);
+            ledcWrite(LCD_LIGHT, LCD_BRIGHTNESS);
             u8g2.sendBuffer();
             if (analogRead(SELECT_BUTTON) > 1000)
             {
@@ -1486,14 +1520,14 @@ void editAlarms()
 
             if (count == 0)
             {
-              buzzer(50, 1);
+              simpleBeep(1, 100, buzzVol);
               buzzVol -= 5;
               if (buzzVol < 5)
                 buzzVol = 255;
             }
             if (count == 1)
             {
-              buzzer(50, 1);
+              simpleBeep(1, 100, buzzVol);
               buzzVol += 5;
               if (buzzVol > 255)
                 buzzVol = 5;
@@ -1869,20 +1903,34 @@ void gpsInfo(String msg)
   smartDelay(900);
 }
 
-/**
- * @brief Generate buzzer sounds with specified parameters
- * @param Delay Duration of each beep in milliseconds
- * @param count Number of beeps to generate
- */
-void buzzer(int Delay, byte count)
+// --- Smooth beep function ---
+// numBeeps: 1 or 2
+// duration_ms: total duration of each beep including fade
+// maxVolume: 0–255 (8-bit PWM)
+
+void simpleBeep(int numBeeps, int duration_ms, byte maxVolume)
 {
-  Serial.println("[DEBUG] buzzer: Beeping " + String(count) + " times with volume " + String(buzzVol));
-  for (int i = 0; i < count; i++)
+  int pauseTime = 150; // pause between double beeps
+
+  if (maxVolume > 255)
+    maxVolume = 255;
+
+  for (int b = 0; b < numBeeps; b++)
   {
-    analogWrite(BUZZER_PIN, buzzVol);
-    delay(Delay);
-    analogWrite(BUZZER_PIN, 0);
-    delay(Delay);
+    // Turn on buzzer at maxVolume
+    ledcWriteTone(BUZZER_PIN, PWM_FREQ);
+    ledcWrite(BUZZER_PIN, maxVolume);
+
+    // Hold for the specified duration
+    delay(duration_ms);
+
+    // Turn off buzzer
+    ledcWriteTone(BUZZER_PIN, 0);
+    ledcWrite(BUZZER_PIN, 0);
+
+    // Pause between beeps
+    if (b < numBeeps - 1)
+      delay(pauseTime);
   }
 }
 
