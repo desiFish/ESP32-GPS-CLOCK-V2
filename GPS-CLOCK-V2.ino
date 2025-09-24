@@ -118,13 +118,13 @@ unsigned long lastLightRead = 0;
 unsigned long lastBrightnessUpdate = 0;
 
 const unsigned long lightInterval = 4000;    // lux sampling
-const unsigned long brightnessInterval = 50; // animation
+const unsigned long brightnessInterval = 20; // animation
 
 // BME280 update frequency
 unsigned long lastTime2 = 0;
 const long timerDelay2 = 12000; // temperature sensor update delay
 
-bool isDark; // Tracks ambient light state
+bool isDark, menuOpen = false; // Tracks ambient light state
 float temperature = 0.0;
 int humidity = 0, pressure = 0;
 
@@ -229,16 +229,16 @@ void onOTAEnd(bool success)
     u8g2.print("HAVE FAILED");
     u8g2.sendBuffer();
   }
-  // <Add your own code here>
   updateInProgress = false;
   delay(1000);
 }
 
 time_t prevDisplay = 0; // when the digital clock was displayed
-
 // for creating task attached to CORE 0 of CPU
 TaskHandle_t loop1Task;
 byte currentBrightness = 250; // Track current brightness level
+float lux = 0;
+byte targetBrightness = 0;
 
 /**
  * @brief Generic menu for editing boolean settings
@@ -246,11 +246,10 @@ byte currentBrightness = 250; // Track current brightness level
  * @param prefKey The Preferences key to store the value
  * @param var Reference to the variable to update
  */
-
-// For settings: updates variable and preference
 void editBoolSetting(const char *displayText, const char *prefKey, bool &var)
 {
-  bool count = var;
+  pref.begin("database", false);
+  byte count = !var;
   while (true)
   {
     delay(100);
@@ -259,40 +258,53 @@ void editBoolSetting(const char *displayText, const char *prefKey, bool &var)
     u8g2.setCursor(5, 10);
     u8g2.print(displayText);
     u8g2.drawLine(0, 11, 127, 11);
-    pref.begin("database", false);
     u8g2.setCursor(5, 22);
     u8g2.print("ON");
     u8g2.setCursor(5, 32);
     u8g2.print("OFF");
+    u8g2.setCursor(5, 62);
+    u8g2.print("EXIT");
 
     u8g2.setFont(u8g2_font_waffle_t_all);
-    if (count)
+    if (count == 0)
       u8g2.drawUTF8(24, 22, "\ue14e");
-    else if (!count)
+    else if (count == 1)
       u8g2.drawUTF8(24, 32, "\ue14e");
+    else if (count == 2)
+      u8g2.drawUTF8(32, 62, "\ue14e");
 
     u8g2.sendBuffer();
     if (analogRead(NEXT_BUTTON) > 1000)
     {
+      count++;
       delay(100);
-      count = !count;
+      if (count > 2)
+        count = 0;
     }
 
     if (analogRead(SELECT_BUTTON) > 1000)
     {
+      if (count == 2)
+      {
+        pref.end();
+        return;
+      }
       delay(100);
-      pref.putBool(prefKey, count);
-      var = pref.getBool(prefKey, false);
+      pref.putBool(prefKey, count == 0 ? true : false);
+      var = pref.getBool(prefKey, true);
       pref.end();
       break;
     }
+
+    if (updateInProgress)
+      return;
   }
 }
 
 // For confirmation dialogs: no reference, no preference
-bool editBoolSetting(const char *displayText)
+byte editBoolSetting(const char *displayText)
 {
-  bool count = false;
+  byte count = 0;
   while (true)
   {
     delay(100);
@@ -305,27 +317,37 @@ bool editBoolSetting(const char *displayText)
     u8g2.print("YES");
     u8g2.setCursor(5, 32);
     u8g2.print("NO");
+    u8g2.setCursor(5, 62);
+    u8g2.print("EXIT");
 
     u8g2.setFont(u8g2_font_waffle_t_all);
-    if (!count)
+    if (count == 0)
       u8g2.drawUTF8(24, 22, "\ue14e");
-    else if (count)
+    else if (count == 1)
       u8g2.drawUTF8(24, 32, "\ue14e");
+    else if (count == 2)
+      u8g2.drawUTF8(32, 62, "\ue14e");
 
     u8g2.sendBuffer();
     if (analogRead(NEXT_BUTTON) > 1000)
     {
+      count++;
       delay(100);
-      count = !count;
+      if (count > 2)
+        count = 0;
     }
 
     if (analogRead(SELECT_BUTTON) > 1000)
     {
+      if (count == 2)
+        return 5; // random number returned to indicate exit
       delay(100);
       break;
     }
+    if (updateInProgress)
+      return 5; // random number returned to indicate exit
   }
-  return !count;
+  return count;
 }
 
 // --- Serve static files from LittleFS (SPIFFS) and provide async API for WiFi credentials ---
@@ -639,8 +661,6 @@ void setup(void)
       0);          /* pin task to core 0 */
 }
 
-float lux = 0;
-byte targetBrightness = 0;
 /**
  * @brief Secondary loop running on Core 0
  *
@@ -704,7 +724,8 @@ void loop1(void *pvParameters)
 
         if (isDark && offInDark)
         {
-          currentBrightness = 0; // force off
+          if (!menuOpen)
+            currentBrightness = 0; // force off
         }
         else
         {
@@ -774,6 +795,10 @@ void loop1(void *pvParameters)
         alarmTriggered = false;
       }
     }
+
+    if (menuOpen)
+      simpleBeep(1, 100, 20);
+
     delay(50);
   }
 }
@@ -1029,8 +1054,10 @@ void loop(void)
     // if it is, set ledPin to HIGH
     if (analogRead(NEXT_BUTTON) > 1000)
     {
+      menuOpen = true;
       Serial.println("[DEBUG] loop: NEXT_BUTTON pressed, entering menu");
       menu();
+      menuOpen = false;
     }
   }
 }
@@ -1140,6 +1167,8 @@ void menu()
       else if (count == 7)
         return;
     }
+    if (updateInProgress)
+      return;
   }
 }
 
@@ -1161,7 +1190,7 @@ void adjustBrightness()
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_t0_11_mf);
     u8g2.setCursor(5, 10);
-    u8g2.print("DISPLAY: BRIGHTNESS");
+    u8g2.print("SETTINGS: DISPLAY");
     u8g2.drawLine(0, 11, 127, 11);
     u8g2.setCursor(5, 22);
     u8g2.print("MANUAL CONTROL");
@@ -1298,12 +1327,7 @@ void adjustBrightness()
         u8g2.print("AUTOBRIGHT");
         u8g2.sendBuffer();
         delay(300);
-        if (autoBright == true)
-          count = 0;
-        else
-          count = 1;
-
-        editBoolSetting("AUTO BRIGHTNESS", "autoBright", autoBright);
+        editBoolSetting("BRIGHTNESS: AUTO", "autoBright", autoBright);
         count = 3;
       }
       else if (count == 2)
@@ -1336,11 +1360,7 @@ void adjustBrightness()
           u8g2.print("DARK-OFF");
           u8g2.sendBuffer();
           delay(300);
-          if (offInDark == true)
-            count = 0;
-          else
-            count = 1;
-          editBoolSetting("OFF IN DARK", "offInDark", offInDark);
+          editBoolSetting("BRIGHTNESS: DARK OFF", "offInDark", offInDark);
           count = 3;
         }
       }
@@ -1351,6 +1371,8 @@ void adjustBrightness()
         return;
       }
     }
+    if (updateInProgress)
+      return;
   }
 }
 
@@ -1544,6 +1566,8 @@ void editAlarms()
         return;
       }
     }
+    if (updateInProgress)
+      return;
   }
 }
 
@@ -1611,6 +1635,8 @@ void changeMode()
       }
     }
   }
+  if (updateInProgress)
+    return;
 }
 /**
  * @brief Configure WiFi settings
@@ -1667,6 +1693,8 @@ void aboutGPS()
       delay(100);
       break;
     }
+    if (updateInProgress)
+      return;
   }
   return;
 }
@@ -1718,6 +1746,8 @@ void displayInfo()
       delay(100);
       break;
     }
+    if (updateInProgress)
+      return;
   }
 }
 
@@ -1734,7 +1764,7 @@ void resetAll()
   u8g2.print("RESET");
   u8g2.sendBuffer();
   delay(300);
-  bool count = false;
+  byte count = 0;
   while (true)
   {
     delay(100);
@@ -1747,18 +1777,24 @@ void resetAll()
     u8g2.print("RESET ALL");
     u8g2.setCursor(5, 32);
     u8g2.print("RESET WIFI");
+    u8g2.setCursor(5, 42);
+    u8g2.print("EXIT");
 
     u8g2.setFont(u8g2_font_waffle_t_all);
-    if (!count)
+    if (count == 0)
       u8g2.drawUTF8(60, 22, "\ue14e");
-    else if (count)
+    else if (count == 1)
       u8g2.drawUTF8(68, 32, "\ue14e");
+    else if (count == 2)
+      u8g2.drawUTF8(30, 42, "\ue14e");
 
     u8g2.sendBuffer();
     if (analogRead(NEXT_BUTTON) > 1000)
     {
+      count++;
       delay(100);
-      count = !count;
+      if (count > 2)
+        count = 0;
     }
 
     if (analogRead(SELECT_BUTTON) > 1000)
@@ -1766,11 +1802,13 @@ void resetAll()
       delay(100);
       break;
     }
+    if (updateInProgress)
+      return;
   }
-  if (!count)
+  if (count == 0)
   {
     count = editBoolSetting("RESET: ALL");
-    if (count)
+    if (!count)
     {
       pref.putInt("lcd_bright", 250);
       pref.putBool("autoBright", true);
@@ -1800,10 +1838,10 @@ void resetAll()
       ESP.restart();
     }
   }
-  else if (count)
+  else if (count == 1)
   {
     count = editBoolSetting("RESET: WIFI");
-    if (count)
+    if (!count)
     {
       pref.putString("ssid", "");
       pref.putString("password", "");
@@ -1824,6 +1862,11 @@ void resetAll()
       }
       ESP.restart();
     }
+  }
+  else if (count == 2)
+  {
+    pref.end();
+    return;
   }
 }
 
