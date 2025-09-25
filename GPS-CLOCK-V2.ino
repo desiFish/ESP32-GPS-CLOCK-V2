@@ -796,20 +796,23 @@ void loop1(void *pvParameters)
 
     if (menuOpen)
       simpleBeep(1, 100, 20);
-
-    static byte lastSeconds = 0;
-    static unsigned long lastSecondChange = 0;
-
-    if (seconds != lastSeconds)
+    else
     {
-      lastSeconds = seconds;
-      lastSecondChange = millis();
-    }
-    else if (millis() - lastSecondChange > 10000)
-    {
-      // Beep if seconds hasn't changed for >10s (possible GPS freeze)
-      simpleBeep(4, 200, 100);
-      lastSecondChange = millis(); // Prevent continuous beeping
+
+      static byte lastSeconds = 0;
+      static unsigned long lastSecondChange = 0;
+
+      if (seconds != lastSeconds)
+      {
+        lastSeconds = seconds;
+        lastSecondChange = millis();
+      }
+      else if (millis() - lastSecondChange > 10000)
+      {
+        // Beep if seconds hasn't changed for >10s (possible GPS freeze)
+        simpleBeep(4, 200, 100);
+        lastSecondChange = millis(); // Prevent continuous beeping
+      }
     }
 
     delay(50);
