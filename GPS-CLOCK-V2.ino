@@ -124,9 +124,8 @@ const unsigned long brightnessInterval = 20; // animation
 unsigned long lastTime2 = 0;
 const long timerDelay2 = 12000; // temperature sensor update delay
 
-bool isDark, menuOpen = false; // Tracks ambient light state
-float temperature = 0.0;
-int humidity = 0, pressure = 0;
+bool isDark, menuOpen = false;                   // Tracks ambient light state
+int temperature = 0, humidity = 0, pressure = 0; // global sensor variables
 
 // features config, saved in preference library
 int LCD_BRIGHTNESS, buzzVol;
@@ -515,12 +514,11 @@ void setup(void)
     errorMsgPrint("BME280", "CANNOT FIND");
   }
   // Set up oversampling and filter initialization
-  bme.setSampling(Adafruit_BME280::MODE_FORCED,      // use forced mode for power saving
-                  Adafruit_BME280::SAMPLING_X16,     // temperature
-                  Adafruit_BME280::SAMPLING_X16,     // pressure
-                  Adafruit_BME280::SAMPLING_X16,     // humidity
-                  Adafruit_BME280::FILTER_X16,       // filter
-                  Adafruit_BME280::STANDBY_MS_1000); // set delay between measurements
+  bme.setSampling(Adafruit_BME280::MODE_FORCED,  // use forced mode for power saving
+                  Adafruit_BME280::SAMPLING_X16, // temperature
+                  Adafruit_BME280::SAMPLING_X16, // pressure
+                  Adafruit_BME280::SAMPLING_X16, // humidity
+                  Adafruit_BME280::FILTER_X16);  // filter
   // wifi manager
   if (useWifi)
   {
@@ -752,7 +750,7 @@ void loop1(void *pvParameters)
       {
         Serial.println("[DEBUG] loop1: Reading temperature/humidity sensor...");
         bme.takeForcedMeasurement();
-        temperature = bme.readTemperature();
+        temperature = bme.readTemperature() - 1; // calibration offset (mandated by Bosch datasheet for close space)
         humidity = bme.readHumidity();
         pressure = bme.readPressure() / 100.0F;
         Serial.print("[DEBUG] loop1: Temp=");
@@ -772,9 +770,9 @@ void loop1(void *pvParameters)
       int beeps = 0;
 
       if (minutes == 0 && hourlyAlarm)
-        beeps = 1;
-      else if (minutes == 30 && halfHourlyAlarm)
         beeps = 2;
+      else if (minutes == 30 && halfHourlyAlarm)
+        beeps = 1;
 
       if (beeps > 0)
       {
@@ -798,6 +796,21 @@ void loop1(void *pvParameters)
 
     if (menuOpen)
       simpleBeep(1, 100, 20);
+
+    static byte lastSeconds = 0;
+    static unsigned long lastSecondChange = 0;
+
+    if (seconds != lastSeconds)
+    {
+      lastSeconds = seconds;
+      lastSecondChange = millis();
+    }
+    else if (millis() - lastSecondChange > 10000)
+    {
+      // Beep if seconds hasn't changed for >10s (possible GPS freeze)
+      simpleBeep(4, 200, 100);
+      lastSecondChange = millis(); // Prevent continuous beeping
+    }
 
     delay(50);
   }
@@ -907,25 +920,35 @@ void loop(void)
       prevEpoch = currentEpoch;
       Serial.println("[DEBUG] loop: Updating display");
       u8g2.clearBuffer();
-      u8g2.setFont(u8g2_font_t0_11_tf);
-      u8g2.setCursor(2, 13);
-      u8g2.print(String(temperature, 1)); // Show temperature with 1 decimal place
-      u8g2.setFont(u8g2_font_threepix_tr);
-      u8g2.setCursor(28, 8);
-      u8g2.print("o");
-      u8g2.setFont(u8g2_font_t0_11_tf);
-      u8g2.setCursor(32, 13);
-      u8g2.print("C ");
-      String var = String(int(pressure)) + "hPa";        // Ensure font is set
-      int stringWidth = u8g2.getStrWidth(var.c_str());   // Get exact pixel width
-      u8g2.setCursor(((128 - stringWidth) / 2) + 3, 13); // Center using screen width
-      u8g2.print(var);
-      if (humidity > 99)
-        u8g2.setCursor(90, 13);
+      u8g2.setFont(u8g2_font_t0_12_tf);
+      if (pressure == 0 && temperature == 0 && humidity == 0)
+      {
+        String var = "Updating...";
+        int stringWidth = u8g2.getStrWidth(var.c_str());
+        u8g2.setCursor(((128 - stringWidth) / 2), 13);
+        u8g2.print(var);
+      }
       else
-        u8g2.setCursor(96, 13);
-      u8g2.print(humidity);
-      u8g2.print("%rH");
+      {
+        u8g2.setCursor(2, 13);
+        u8g2.print(String(temperature)); // Show temperature with 1 decimal place
+        u8g2.setFont(u8g2_font_threepix_tr);
+        u8g2.setCursor(17, 8);
+        u8g2.print("o");
+        u8g2.setFont(u8g2_font_t0_12_tf);
+        u8g2.setCursor(21, 13);
+        u8g2.print("C ");
+        String var = String(int(pressure)) + "hPa";      // Ensure font is set
+        int stringWidth = u8g2.getStrWidth(var.c_str()); // Get exact pixel width
+        u8g2.setCursor(((128 - stringWidth) / 2), 13);   // Center using screen width
+        u8g2.print(var);
+        if (humidity > 99)
+          u8g2.setCursor(90, 13);
+        else
+          u8g2.setCursor(96, 13);
+        u8g2.print(humidity);
+        u8g2.print("%rH");
+      }
 
       u8g2.drawLine(0, 17, 127, 17);
       u8g2.setFont(u8g2_font_samim_12_t_all); // u8g2_font_t0_11_mf  u8g2_font_t0_16_mr
