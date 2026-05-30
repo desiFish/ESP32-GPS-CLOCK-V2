@@ -793,28 +793,28 @@ void loop1(void *pvParameters)
         alarmTriggered = false;
       }
     }
-
-    if (menuOpen)
-      simpleBeep(1, 100, 20);
-    else
+    if (!(offInDark && isDark))
     {
-
-      static byte lastSeconds = 0;
-      static unsigned long lastSecondChange = 0;
-
-      if (seconds != lastSeconds)
+      if (menuOpen)
+        simpleBeep(1, 100, 20);
+      else
       {
-        lastSeconds = seconds;
-        lastSecondChange = millis();
-      }
-      else if (millis() - lastSecondChange > 10000)
-      {
-        // Beep if seconds hasn't changed for >10s (possible GPS freeze)
-        simpleBeep(4, 200, 100);
-        lastSecondChange = millis(); // Prevent continuous beeping
+        static byte lastSeconds = 0;
+        static unsigned long lastSecondChange = 0;
+
+        if (seconds != lastSeconds)
+        {
+          lastSeconds = seconds;
+          lastSecondChange = millis();
+        }
+        else if (millis() - lastSecondChange > 10000)
+        {
+          // Beep if seconds hasn't changed for >10s (possible GPS freeze)
+          simpleBeep(4, 200, 100);
+          lastSecondChange = millis(); // Prevent continuous beeping
+        }
       }
     }
-
     delay(50);
   }
 }
